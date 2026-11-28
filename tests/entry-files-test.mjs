@@ -210,7 +210,10 @@ try {
   fs.rmSync(path.join(un, ".agents"), { recursive: true }); fs.symlinkSync("nowhere", path.join(un, ".agents"));
   u = runs();
   ok(u.status === 1 && u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `.agents`") && u.out.includes("(here `.agents`)"), "a file behind a folder made a link leading nowhere fails naming that link, in its mend too", u.out);
-  fs.rmSync(path.join(un, ".agents")); put(".agents/rules/core.md", AG);
+  fs.rmSync(path.join(un, ".agents")); put("agents-real/rules/core.md", `${AG}${big}`); fs.symlinkSync("agents-real", path.join(un, ".agents"));
+  u = runs();
+  ok(u.status === 1 && u.out.includes(".agents/rules/core.md stands here but is not read: ") && !u.out.includes("(here `.agents`)"), "a file past the bound behind a link the read follows fails without naming that link, which is not why it is not read", u.out);
+  fs.rmSync(path.join(un, ".agents")); fs.rmSync(path.join(un, "agents-real"), { recursive: true }); put(".agents/rules/core.md", AG);
   g("update-index", "--add", "--cacheinfo", `160000,${g("rev-parse", "HEAD").trim()},.kiro`); g("commit", "-qm", "a submodule where a tool's folder stands");
   u = runs();
   ok(u.status === 0 && u.out.includes("note") && u.out.includes(".kiro/steering/core.md stands here but is not read") && u.out.includes(".kiro/steering, where an agent tool takes its instructions from, lies in a submodule"),

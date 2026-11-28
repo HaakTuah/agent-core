@@ -209,7 +209,10 @@ if (guard(import.meta.url)) {
   };
   // (the project's own rule files, as its SECURITY.md names them: where it names none, the wait holds, saying the mend,
   // since a list read as empty would let a change to one pass as docs alone; the core's own repository names none there,
-  // every file of it protected, and its list stays empty)
+  // every file of it protected, and its list stays empty. Known limits, each needing what the default branch already
+  // holds: a repository that tracks scripts/core-path.mjs at its root reads as the core here, so keeps that empty list,
+  // as every project did before; and in the core, as below for the links on the way and the tools' folders, a list that
+  // cannot be read is read as empty)
   let rules = [];
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch (e) { if (!coreItself(".")) { console.error(`FAIL: ${e.message}`); process.exit(1); } }
   // (and each link on the way to a tool's folder or file or a floor file, which a pull request may point elsewhere)

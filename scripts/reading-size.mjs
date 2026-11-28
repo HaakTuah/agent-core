@@ -42,7 +42,7 @@ const git = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 <
 const MARKS = process.argv[2];
 if (!MARKS) { console.error("FAIL: no config was named. Mend: name it: node <the core's path, core/ as a rule>scripts/reading-size.mjs <config>"); process.exit(1); }
 let marks;
-if (linkedOut(MARKS)) { console.error(asText(`FAIL: ${MARKS} leads out of the project, or nowhere, through the link ${firstLink(MARKS) ?? MARKS}, so it is not read. Mend: make ${MARKS} a regular file of the project's own, reached through no link that leads out of it`)); process.exit(1); }
+if (linkedOut(MARKS)) { console.error(asText(`FAIL: ${MARKS} leads out of the project, or nowhere${firstLink(MARKS) ? `, through the link ${firstLink(MARKS)}` : ""}, so it is not read. Mend: make ${MARKS} a regular file of the project's own, reached through no link that leads out of it`)); process.exit(1); }
 try { marks = parseBounded(regularText(MARKS, { bound: 1 << 26 }) ?? ""); } catch (e) { console.error(`FAIL: ${MARKS} could not be read as JSON (${String(e.message).replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]/gu, "?")}). Mend: name the config the copies workflow is given, and write it as JSON`); process.exit(1); }
 if (!marks || typeof marks !== "object" || Array.isArray(marks)) marks = {}; // (JSON's null, a list or a value alone: the form below refuses it)
 const num = v => Number.isInteger(v) && v > 0, obj = o => o && typeof o === "object" && !Array.isArray(o), nums = o => obj(o) && Object.values(o).every(num);

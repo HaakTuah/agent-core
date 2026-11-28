@@ -72,7 +72,7 @@ const real = p => { try { return fs.realpathSync.native(p); } catch { return p; 
 let CONFIG_AT;
 try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(real(ROOT), path.join(real(path.dirname(path.resolve(configPath))), path.basename(configPath))).split(path.sep).join("/"); }
 let config;
-if (linkedOut(configPath)) fail(`the config ${configPath} leads out of the project, or nowhere, through the link ${firstLink(configPath) ?? configPath}, so it is not read. Mend: make ${configPath} a regular file of the project's own, reached through no link that leads out of it`);
+if (linkedOut(configPath)) fail(`the config ${configPath} leads out of the project, or nowhere${firstLink(configPath) ? `, through the link ${firstLink(configPath)}` : ""}, so it is not read. Mend: make ${configPath} a regular file of the project's own, reached through no link that leads out of it`);
 try { config = JSON.parse(regularText(configPath, { bound: 1 << 26 }) ?? ""); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
