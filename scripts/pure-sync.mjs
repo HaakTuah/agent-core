@@ -41,6 +41,11 @@ import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
 import { headFrom } from "./own-head.mjs";
 import { project } from "./steps.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git and gh, started here in a clone whose head may be another's, are looked for on the PATH alone, before
+// anything runs: workflow-run.mjs)
+lookOnlyOnPath();
 
 const CORE = `https://github.com/${ADDRESS}.git`;
 const [mode, asked, ...more] = process.argv.slice(2), tried = mode === "--trial" && !more.length && /^[0-9a-f]{40}$/u.test(asked ?? "") ? asked : null;

@@ -281,4 +281,17 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   ok(!ran && r.stdout.trim() === "null", "a program named git in the folder the guard's git starts in runs in its place for none of it, \".\" and an empty entry on the PATH too", `${ran} ${r.stdout}${r.stderr}`);
 }
 
+// (each script the core runs from its main on a head not yet proven the repository's own calls the guard itself, at
+// its top, before any line that starts a program: its own import, never one it borrows, so no reshuffle of imports
+// drops it)
+{
+  const HEADS = ["pure-sync.mjs", "attached.mjs", "own-head.mjs", "queue-only.mjs", "comment-only.mjs"];
+  const unguarded = HEADS.filter(f => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, "..", "scripts", f), "utf8");
+    const call = src.search(/^lookOnlyOnPath\(\);$/mu), start = src.search(/\b(execFileSync|spawnSync|execSync|spawn|execFile|exec)\s*\(/u);
+    return !/^import \{ lookOnlyOnPath \} from "\.\/workflow-run\.mjs";$/mu.test(src) || call < 0 || (start >= 0 && start < call);
+  });
+  ok(unguarded.length === 0, "each script run on a head not yet proven the repository's own calls the guard at its top, before it starts any program", unguarded.join(", "));
+}
+
 done("steps-tool-files");

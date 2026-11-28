@@ -35,6 +35,11 @@ import { started } from "./started.mjs";
 import { copyRefused, outside } from "./copy-runs.mjs";
 import { plain, shown } from "./step-checks.mjs";
 import { notDone, project } from "./steps.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git and gh, started here in a clone whose head may be another's, are looked for on the PATH alone, before
+// anything runs: workflow-run.mjs)
+lookOnlyOnPath();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const git = (root, args, env = process.env, input) => execFileSync("git", args, { cwd: root, env, input, encoding: "utf8", stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();

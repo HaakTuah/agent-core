@@ -46,6 +46,11 @@ import { byAgent, LIST, opens } from "./labels.mjs";
 import { LARGEST, linesOf } from "./queue.mjs";
 import { RULES, ruleFiles } from "./rule-files.mjs";
 import { started } from "./started.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git, started here in the folder this runs in, a head's checkout where a session runs it there, is looked for on
+// the PATH alone: workflow-run.mjs)
+lookOnlyOnPath();
 
 const SHA = /^[0-9a-f]{40}$/u;
 const RECORD = ["by:chat", "by:design"], NONE = new Set(["bug", "by:look"]), BARRED = ["on-hold", "stand-in-yes"];

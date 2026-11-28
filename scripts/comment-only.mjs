@@ -30,6 +30,11 @@ import { execFileSync } from "node:child_process";
 import { readYaml } from "./comment-only-yaml.mjs";
 import { RUNS, RUNS_TOO } from "./runs-by-itself.mjs";
 import { started } from "./started.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git, started here in the folder this runs in, a head's checkout where a session runs it there, is looked for on
+// the PATH alone: workflow-run.mjs)
+lookOnlyOnPath();
 
 const YAML = /\.ya?ml$/iu;
 // a comment a tool may read as an instruction (a check silenced, a linter told to look away)
