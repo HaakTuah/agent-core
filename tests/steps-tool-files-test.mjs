@@ -3,7 +3,7 @@
 // the starter kit of this commit writes in a scratch folder. Node's own modules and git.
 //
 //   node tests/steps-tool-files-test.mjs
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -233,6 +233,25 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
     ok(/lie outside the project/u.test(away ?? ""), "nor a copy that is a link to the same bytes elsewhere", `${away}`);
   }
   ok(step.check(project(d)) === null, "and with the copy put back, the step reads it and has nothing to list", step.check(project(d)) ?? "");
+}
+
+// a program named as git, committed where the guard's own git starts, never runs in its place, though the PATH leads to
+// the folder it starts in and, on Windows, nothing told it not to look there: the guard tells its process so (as
+// check-test.mjs holds of check.mjs; on Windows a stand-in that prints, elsewhere one that leaves a mark)
+{
+  const d = dirs["an-npm-project"], win = process.platform === "win32", mark = path.join(tmp, "planted-git-ran");
+  const planted = path.join(d, "core", win ? "git.exe" : "git");
+  if (win) fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), planted);
+  else { fs.writeFileSync(planted, `#!/bin/sh\necho ran > ${JSON.stringify(mark)}\n`); fs.chmodSync(planted, 0o755); }
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== "NoDefaultCurrentDirectoryInExePath"));
+  const key = Object.keys(env).find(k => /^path$/iu.test(k)) ?? "PATH";
+  env[key] = `.${path.delimiter}${path.delimiter}${env[key] ?? ""}`;
+  const guard = pathToFileURL(path.join(import.meta.dirname, "..", "scripts", "copy-runs.mjs")).href;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", `const { copyRefused } = await import(${JSON.stringify(guard)}); console.log(String(copyRefused(${JSON.stringify(d)}, "core/")));`], { cwd: path.join(d, "core"), env, encoding: "utf8" });
+  fs.rmSync(planted);
+  const ran = fs.existsSync(mark);
+  fs.rmSync(mark, { force: true });
+  ok(!ran && r.stdout.trim() === "null", "a program named git in the folder the guard's git starts in runs in its place for none of it, \".\" and an empty entry on the PATH too", `${ran} ${r.stdout}${r.stderr}`);
 }
 
 done("steps-tool-files");

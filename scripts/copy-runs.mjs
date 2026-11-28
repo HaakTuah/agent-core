@@ -2,7 +2,7 @@
 // writers do (step-checks-tool-files.mjs, step-writers.mjs, the steps 825 and 827 of steps/, and attached.mjs where the
 // copy was not found whole at its pin): only where the copy lies in the project and is this code itself, or holds what
 // it can load byte for byte as this code does, so that one run from a clone never runs a copy that was changed. Reads
-// only; git, Node's own modules and step-checks.mjs beside it.
+// only; git, Node's own modules, and step-checks.mjs and workflow-run.mjs beside it.
 //
 // Not held here, each asking a foothold first (the owner's answer 5 on release 8's hardening): what is installed beside
 // the copy outside git, a change made between this reading and the run, a sync at the pin the copy already has, and
@@ -13,11 +13,13 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { shown } from "./step-checks.mjs";
+import { withAbsolutePath } from "./workflow-run.mjs";
 
-// (on Windows, no program is looked for in the folder it is started in, which the project fills, as check.mjs says,
-// for each process that loads this file: the steps, and the copy's scripts they run; every other system looks only on
-// the PATH)
+// (no program is looked for in the folder it is started in, which the project fills, as check.mjs holds it, for each
+// process that loads this file: the steps, and the copy's scripts they run. On Windows not by default, and on any system
+// not by way of a relative entry on the PATH, "." or an empty one among them)
 if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
+for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // (what a script of the core's can load: its scripts, and the packages it imports from .packages/ by its lock files)
 export const LOADED = ["scripts", ".packages"];
