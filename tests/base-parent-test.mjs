@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { mended } from "../scripts/mend.mjs";
-import { root, scratchDir, tally } from "../scripts/scratch-core.mjs";
+import { loadedBy, root, scratchDir, tally } from "../scripts/scratch-core.mjs";
 
 const { ok, done } = tally();
 const tmp = scratchDir("base-parent-test-");
@@ -29,7 +29,7 @@ function merged(dir) {
 {
   const dir = path.join(tmp, "checks");
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of ["checks.mjs", "core-address.mjs", "core-path.mjs", "mend.mjs", "started.mjs", "workflow-run.mjs", "parse-yaml.mjs", "guards.mjs", "yaml-keys.mjs", "packages.mjs", "npm-reads.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of [...loadedBy("checks.mjs"), "core-path.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/yaml"]) fs.cpSync(path.join(root, ".packages", f), path.join(dir, "core/.packages", f), { recursive: true });
   // (stand-ins that print the base they were given: the lookup, and NuGet's first look, which says nothing changed)
   write(dir, { "core/scripts/lookup.mjs": "console.log(`ran lookup.mjs LOOKUP_BASE=${process.env.LOOKUP_BASE}`);\n",

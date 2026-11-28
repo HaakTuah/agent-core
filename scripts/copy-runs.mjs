@@ -5,8 +5,9 @@
 // only; git, Node's own modules, and step-checks.mjs and workflow-run.mjs beside it.
 //
 // Not held here, each asking a foothold first (the owner's answer 5 on release 8's hardening): what is installed beside
-// the copy outside git, a change made between this reading and the run, a sync at the pin the copy already has, and
-// what attached.mjs's own reading of a copy whole at its pin lets through.
+// the copy outside git, a change made between this reading and the run, a sync at the pin the copy already has, what
+// attached.mjs's own reading of a copy whole at its pin lets through, and a PATH the session's own environment gives
+// that holds no absolute folder.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";

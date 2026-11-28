@@ -179,7 +179,7 @@ function pureSync(root, at, bare, why, tmp, said) {
   if (!side) return;
   const dir = path.join(tmp, "side");
   // (the installer's own words left out, as the sync leaves them out: a line of them can name a path on this machine)
-  if (!unpack(bare, side, dir)) return said.unread("the sync", `the core's side, ${side.slice(0, 7)}, could not install its packages (its scripts/install.mjs stopped or ran past ten minutes), so pure-sync.mjs was not run from it. Mend: run this again once the registry answers`);
+  if (!unpack(bare, side, dir)) return said.unread("the sync", `the core's side, ${side.slice(0, 7)}, could not install its packages (its scripts/install.mjs stopped or ran past ten minutes), so pure-sync.mjs was not run from it. Mend: run this again; where it stops again, run that install in a clone of the core at ${side.slice(0, 7)}, \`node <the clone>/scripts/install.mjs all\`, which says why`);
   const r = spawnSync(process.execPath, [path.join(dir, "scripts", "pure-sync.mjs")], { cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   if (r.status === 0) return;
   const notPure = String(r.stdout ?? "").split("\n").filter(l => l.startsWith("  NOT PURE ")).map(l => l.slice("  NOT PURE ".length));

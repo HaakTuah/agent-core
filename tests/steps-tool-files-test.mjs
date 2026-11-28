@@ -206,15 +206,15 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   ok(!pointed.ran && /^the pointers: core\/ was not found whole at its pin; core\/'s scripts and packages are not those of the core running these steps \(core\/scripts\/pointers\.mjs is changed\), so none of them was run from here\. Mend: run this from the project's copy, `node core\/scripts\/attached\.mjs`/mu.test(pointed.out), "nor attached.mjs, run from here, where the copy was not found whole at its pin", `${pointed.ran} ${pointed.out}`);
   // (and no other step, nor steps.mjs or attached.mjs, starts Node or loads code but through copy-runs.mjs, or as each
   // run or load named here, of the core's own files or past copy-runs.mjs's reading, does: by Node's own path, by a bare
-  // `node`, by fork() or a Worker, or by import() or createRequire(). Left to review, since no grep tells it: a run by a
-  // shell's words, and a load through a helper of another file given a path the copy holds)
+  // `node`, by fork() or a Worker, by import() or createRequire(), or by evaluating text. Left to review, since no grep
+  // tells it: a run by a shell's words, and a load through a helper of another file given a path the copy holds)
   const scripts = path.join(import.meta.dirname, "..", "scripts");
   const swept = [...fs.readdirSync(scripts).filter(f => /^step-.*\.mjs$/u.test(f)), ...fs.readdirSync(path.join(scripts, "steps")).map(f => `steps/${f}`), "steps.mjs", "attached.mjs"];
   const named = {
     "steps.mjs": ["import(pathToFileURL(path.join(FOLDER, f)).href)", "import(\"./converge.mjs\")"],
     "attached.mjs": ["spawnSync(process.execPath, [path.join(scripts, \"pointers.mjs\")]", "spawnSync(process.execPath, [path.join(dir, \"scripts\", \"install.mjs\"), \"all\"]", "spawnSync(process.execPath, [path.join(dir, \"scripts\", \"pure-sync.mjs\")]"],
   };
-  const starts = /process\.execPath|["'`]node(\.exe)?["'`]|\bfork\(|new Worker\(|\bimport\(|createRequire\(/u;
+  const starts = /process\.(execPath|argv0|argv\[0\])|["'`]node(\.exe)?["'`]|\bfork\s*\(|new\s+Worker\s*\(|\bimport\s*\(|createRequire\s*\(|node:vm|\beval\s*\(|new\s+Function\b/u;
   const unnamed = swept.flatMap(f => fs.readFileSync(path.join(scripts, f), "utf8").split("\n").filter(l => !/^\s*\/\//u.test(l) && starts.test(l))
     .filter(l => !(named[f] ?? []).some(n => l.includes(n))).map(l => `${f}: ${l.trim().slice(0, 120)}`));
   const unused = Object.entries(named).flatMap(([f, ns]) => ns.filter(n => !fs.readFileSync(path.join(scripts, f), "utf8").includes(n)).map(n => `${f}: ${n}`));
