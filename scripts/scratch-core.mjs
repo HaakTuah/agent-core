@@ -292,7 +292,7 @@ process.exit(0);
   let windows = {};
   if (process.platform === "win32") {
     const preload = path.join(stubs, "gh-stand-in.cjs");
-    fs.writeFileSync(preload, `if (require("path").basename(process.execPath).toLowerCase() === "gh.exe") {\nconst a = [require("path").basename(process.argv[1]), ...process.argv.slice(2)];\n${answer}}\n`);
+    fs.writeFileSync(preload, `if (require("path").basename(process.execPath).toLowerCase() === "gh.exe") {\nconst [, script, ...rest] = process.argv, a = [require("path").basename(script), ...rest];\n${answer}}\n`);
     try { fs.linkSync(process.execPath, path.join(stubs, "gh.exe")); } catch { fs.copyFileSync(process.execPath, path.join(stubs, "gh.exe")); }
     windows = { NODE_OPTIONS: `${env.NODE_OPTIONS ?? ""} --require "${preload.replace(/\\/g, "/")}"`.trim() };
   }
