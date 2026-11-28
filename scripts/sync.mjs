@@ -28,7 +28,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { CORE } from "./core-address.mjs";
 import { copyTree, recordModes } from "./copy-tree.mjs";
 import { readCore } from "./core-path.mjs";

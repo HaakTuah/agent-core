@@ -214,25 +214,25 @@ const plantedPure = withPlanted(path.join(theCore, "scripts", "pure-sync.mjs")),
 for (const f of planted) fs.rmSync(f);
 {
   // (nor by the proofs of a queue's lines and of comments alone, run from the core's main in a checkout of a head not
-  // yet proven the repository's own: a git of the head's at its root, "." first on the PATH, leaves its mark for
-  // neither; on Windows Node's own program as git.exe, which a preloaded file makes leave it, elsewhere a script. The
-  // planted program is run once first, so a mark that cannot be left proves nothing)
-  const mark = path.join(tmp, "planted-git-ran"), win = process.platform === "win32", at = path.join(p, win ? "git.exe" : "git");
+  // yet proven the repository's own, nor by the look at whether the core moved, run in the project's own clone: a git
+  // and a gh of the branch's at its root, "." first on the PATH, leave their mark for none of them; on Windows Node's
+  // own program as git.exe and gh.exe, which a preloaded file makes leave it where it starts from that folder alone,
+  // elsewhere a script. Each planted program is run once first, so a mark that cannot be left proves nothing)
+  const mark = path.join(tmp, "planted-ran"), win = process.platform === "win32", at = ["git", "gh"].map(n => path.join(p, win ? `${n}.exe` : n));
   const env = { ...dotFirst };
   if (win) {
-    const preload = path.join(tmp, "planted-git.cjs");
-    fs.copyFileSync(process.execPath, at);
-    fs.writeFileSync(preload, `if (require("path").basename(process.execPath).toLowerCase() === "git.exe") { require("fs").writeFileSync(${JSON.stringify(mark)}, "ran"); process.exit(1); }\n`);
+    const preload = path.join(tmp, "planted.cjs");
+    for (const f of at) fs.copyFileSync(process.execPath, f);
+    fs.writeFileSync(preload, `const path = require("path"); if (path.dirname(process.execPath).toLowerCase() === ${JSON.stringify(p.toLowerCase())}) { require("fs").writeFileSync(${JSON.stringify(mark)}, "ran"); process.exit(1); }\n`);
     env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --require "${slash(preload)}"`.trim();
-  } else fs.writeFileSync(at, `#!/bin/sh\necho ran > "${slash(mark)}"\nexit 1\n`, { mode: 0o755 });
-  spawnSync(at, ["--version"], { cwd: p, env });
-  const leaves = fs.existsSync(mark);
-  fs.rmSync(mark, { force: true });
-  const runs = [["queue-only.mjs", path.join(tmp, "no-pull.json"), path.join(tmp, "no-files.json")], ["comment-only.mjs"]]
-    .map(([f, ...args]) => spawnSync(process.execPath, [path.join(theCore, "scripts", f), ...args], { cwd: p, env: { ...env, REPO: "someone/project" }, encoding: "utf8" }));
+  } else for (const f of at) fs.writeFileSync(f, `#!/bin/sh\necho ran > "${slash(mark)}"\nexit 1\n`, { mode: 0o755 });
+  const leaves = at.every(f => { spawnSync(f, ["--version"], { cwd: p, env }); const left = fs.existsSync(mark); fs.rmSync(mark, { force: true }); return left; });
+  const runs = [["queue-only.mjs", path.join(tmp, "no-pull.json"), path.join(tmp, "no-files.json")], ["comment-only.mjs"], ["core-moved.mjs"]]
+    .map(([f, ...args]) => spawnSync(process.execPath, [path.join(theCore, "scripts", f), ...args], { cwd: p, env: { ...env, REPO: "someone/project", GITHUB_REPOSITORY: "someone/project" }, encoding: "utf8", timeout: 120000 }));
   const ranHere = fs.existsSync(mark);
-  fs.rmSync(at); fs.rmSync(mark, { force: true });
-  ok(leaves && !ranHere && runs.every(r => !r.error), "  nor by the proofs of a queue's lines or of comments alone, which call the same guard first", `${leaves} ${ranHere}\n${runs.map(r => `${r.stdout}${r.stderr}`).join("\n")}`);
+  for (const f of at) fs.rmSync(f);
+  fs.rmSync(mark, { force: true });
+  ok(leaves && !ranHere && runs.every(r => !r.error), "  nor by the proofs of a queue's lines or of comments alone, nor by the look at whether the core moved, which call the same guard first", `${leaves} ${ranHere}\n${runs.map(r => `${r.stdout}${r.stderr}`.slice(0, 600)).join("\n")}`);
 }
 ok(plantedPure.status === 0 && plantedPure.out.includes(`sha=${LEGIT}`) && plantedAttached.status === 0 && !fs.existsSync(ran),
   "  and a git or gh of the head's own at its root is never run, the folder it starts in left out of the search, \".\" first on the PATH or not", `${plantedPure.out}\n${plantedAttached.out}\n${fs.existsSync(ran)}`);
