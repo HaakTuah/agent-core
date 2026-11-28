@@ -12,12 +12,13 @@ import { FOLDERS, TOOL_FILES, ruleFiles } from "./rule-files.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { copiesConfig } from "./check-configs.mjs";
 import { shown } from "./step-checks.mjs";
+import { copyRefused } from "./copy-runs.mjs";
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; core-changes/projects.md of the
 // core, "Nothing locks a project": no old breach goes unlisted): each copy there in the copies check's baseline, which
 // `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
 // old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
-// holds and fails none; null where nothing is left to list.
+// holds and fails none, and only where that copy is the core's code running now (copy-runs.mjs); null where nothing is left to list.
 // Both checks read only the files git tracks, as the work tree holds them (a tracked link, what it leads to), and the
 // copies check its config and baseline besides: where none of the files they read changed since the last reading in
 // this process, that reading's answer stands, so the two runs are made once for each state of the project (a sync reads
@@ -75,11 +76,15 @@ function filesRead(p, config, tracked, git) {
   } catch { return null; }
 }
 
+// (the copy's scripts run only where they are the core's code running now, byte for byte: copy-runs.mjs; each given ten
+// minutes, so that none holds the steps)
 export function toolFilesRead(p, config) {
+  const at = script => path.join(p.root, copyAt(p), "scripts", script);
+  for (const script of ["copies.mjs", "pointers.mjs"]) if (!fs.existsSync(at(script))) throw new Unread(`no copy of ${script} to run`);
+  const refused = copyRefused(p.root, copyAt(p));
+  if (refused) throw new Unread(refused);
   const run = (script, args, env) => {
-    const at = path.join(p.root, copyAt(p), "scripts", script);
-    if (!fs.existsSync(at)) throw new Unread(`no copy of ${script} to run`);
-    const r = spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, ...env } });
+    const r = spawnSync(process.execPath, [at(script), ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600000, env: { ...process.env, ...env } });
     return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
   };
   // (a run that never reached its verdict read nothing: reported as not read, never as done)

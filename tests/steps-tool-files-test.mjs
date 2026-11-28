@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { toolFilesRead, toolFilesState } from "../scripts/step-checks-tool-files.mjs";
 import { STEPS, Unread, project } from "../scripts/steps.mjs";
+import { Unwritten, held, writeToolCopies } from "../scripts/step-writers.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 import { kitIn } from "../scripts/steps-kit.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -156,5 +157,41 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   }
 }
 
+// a copy that is not the core's code running these steps, byte for byte, is never run by them: its reader is not read and
+// its writer writes nothing, while a copy that holds that code still runs (copy-runs.mjs)
+{
+  const step = STEPS.find(s => s.lead === "16 November 2026, the agent tools' files read for copies and pointers"), d = dirs["an-npm-project"];
+  const mark = path.join(tmp, "copy-ran"), said = f => { try { return f() ?? ""; } catch (e) { return e instanceof Unread ? e.message : `${e}`; } };
+  const changed = (script, read) => {
+    const at = path.join(d, "core/scripts", script), was = fs.readFileSync(at);
+    fs.writeFileSync(at, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
+    const out = said(read), ran = fs.existsSync(mark);
+    fs.writeFileSync(at, was); fs.rmSync(mark, { force: true });
+    return { out, ran };
+  };
+  const refused = /^core\/'s scripts and packages are not those of the core running these steps \(core\/scripts\/(pointers|copies)\.mjs is changed\), so none of them was run from here\. Mend: run the steps from the project's copy, `node core\/scripts\/steps\.mjs`/u;
+  for (const script of ["pointers.mjs", "copies.mjs"]) {
+    const { out, ran } = changed(script, () => step.check(project(d)));
+    ok(!ran && refused.test(out), `with a changed copy of ${script}, the step runs none of the copy and is not read`, `${ran} ${out}`);
+  }
+  const written = changed("copies.mjs", () => { try { return writeToolCopies(project(d), held(d)).join(","); } catch (e) { return e instanceof Unwritten ? e.message : `${e}`; } });
+  ok(!written.ran && refused.test(written.out), "and the writer of the copies check's baseline runs none of it and writes nothing", `${written.ran} ${written.out}`);
+  if (process.platform !== "win32") {
+    const at = path.join(d, "core/scripts/pointers.mjs"), was = fs.readFileSync(at), outside = path.join(tmp, "pointers-outside.mjs");
+    fs.writeFileSync(outside, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
+    fs.rmSync(at); fs.symlinkSync(outside, at);
+    const out = said(() => step.check(project(d))), ran = fs.existsSync(mark);
+    fs.rmSync(at); fs.writeFileSync(at, was); fs.rmSync(mark, { force: true });
+    ok(!ran && /core\/scripts\/pointers\.mjs is changed/u.test(out), "nor one whose script is a link to another file", `${ran} ${out}`);
+  }
+  // (a new file beside the copy's scripts, which a changed script could load, counts as a change too: read past the
+  // step's cache, which keeps an answer read before it and runs nothing)
+  const extra = path.join(d, "core/scripts/extra.mjs");
+  fs.writeFileSync(extra, "export {};\n");
+  const added = said(() => { const p = project(d); return toolFilesRead(p, toolFilesState(p).config); });
+  fs.rmSync(extra);
+  ok(/core\/scripts\/extra\.mjs is not the core's/u.test(added), "nor one that holds a script the core does not", added);
+  ok(step.check(project(d)) === null, "and with the copy put back, the step reads it and has nothing to list", step.check(project(d)) ?? "");
+}
 
 done("steps-tool-files");
