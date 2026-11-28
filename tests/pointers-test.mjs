@@ -195,6 +195,16 @@ try {
     g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a link to a folder");
     t = check({ POINTERS_BASE: "HEAD" });
     ok(t.status === 0 && !/EISDIR/.test(t.out), "a link to a folder in a tool's folder is passed over, failing nothing", t.out);
+    // (a file past the bound where a tool's folder that is a link leads: noted where the base held it as it stands, failed
+    // where the pull request changes it)
+    put("docs/big/huge.md", `# Huge\n\n${"x".repeat((1 << 20) + 10)}\n`);
+    fs.symlinkSync("../docs/big", path.join(tools, ".kiro/agents"));
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a linked tool's folder with a large file");
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 0 && /^note the rule file docs\/big\/huge\.md is no regular file .*the pull request's base held it/m.test(t.out), "a file past the bound where a linked tool's folder leads, which the base held as it stands, is noted and fails nothing", t.out);
+    put("docs/big/huge.md", `# Huge\n\n${"y".repeat((1 << 20) + 10)}\n`);
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 1 && mended(t.out) && /FAIL: the rule file docs\/big\/huge\.md is no regular file/.test(t.out), "and one the pull request changes fails, saying its mend", t.out);
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails

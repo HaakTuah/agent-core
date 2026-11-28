@@ -11,9 +11,9 @@
 // and a check passes a `read` and a `list` that read a commit's tree, to hold the base's list. A reader may carry
 // `where`, the path a path leads to, its links followed (followLinks), so that a tool's folder that is a link is
 // listed where it leads: readHere and readAt's readers carry it.
-// Not hardened here, each needing text already on the default branch to act as a tool's instructions: a link on the way
-// to a tool's folder or file, or between the links of a chain, is not itself listed, so a pull request that only points
-// it elsewhere in the project changes no listed file.
+// Not hardened here, each needing links the project already holds on its default branch: a link on the way to a tool's
+// folder or file, or between the links of a chain, is not itself listed, so a pull request that only points it
+// elsewhere in the project changes no listed file.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";

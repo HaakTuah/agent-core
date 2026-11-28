@@ -184,6 +184,12 @@ const md = (filename, extra = {}) => ({ filename, status: "modified", patch: "@@
 ok(is(had([], line, [md("README.md"), md("docs/how.MD"), md("reports/x.md")]), true, "no code review is running"), "docs alone need none");
 ok(["AGENTS.md", "x/CLAUDE.md", "CLAUDE.local.md", "x/AGENTS.override.md", "SECURITY.md", "GEMINI.md", "REVIEW.md", "core-manifest.md", "floor/threat-model.md", "core/README.md", ".github/pull_request_template.md", ".agents/x.md", ".claude/x.md"].every((name) => is(had([], line, [md(name)]), false, "no code review")), "a rule file, the copy of the core, or a file of .github/, .claude/ or .agents/ does");
 ok(is(had([], line, [md("docs/rules.md")], pull, ["docs/rules.md"]), false, "no code review") && is(had([], line, [md("x.md", { status: "renamed", previous_filename: "AGENTS.md" })]), false, "no code review"), "so do the project's own rule files its SECURITY.md names, and one moved from a rule file");
+{
+  // (a file a pull request adds where a tool's folder leads, which no list holds yet: rule-files.mjs's toolFolders)
+  const added = [md("docs/steer/new.md", { status: "added" })], at = (more) => judge({ commits: line.length, changed_files: 1, ...pull }, [], line, added, [], true, undefined, null, more);
+  ok(is(at({ folders: ["docs/steer"] }), false, "no code review") && is(at({ folders: [""] }), false, "no code review") && is(at({ folders: ["docs/other"] }), true, "no code review is running") && is(at({}), true, "no code review is running"),
+    "a file added where a tool's folder leads needs one, the project's root too, and one elsewhere, or with no folders read, does not");
+}
 const inCore = { ...pull, base: { repo: { full_name: CORE.toUpperCase() } } };
 ok(is(had([], line, [md("README.md")], inCore), false, "no code review") && is(had([], line, [md("roles/shared/git.md")], inCore), false, "no code review") && is(had([], line, [md("roles/shared/git.md")]), true, "no code review is running"), "in the core's own repository, where every file is protected, docs need one too; in a project, a folder of that name is docs");
 const pin = (a, b) => `@@ -1 +1 @@\n-    uses: ${CORE}/.github/workflows/size.yml@${a}\n+    uses: ${CORE}/.github/workflows/size.yml@${b}`;
