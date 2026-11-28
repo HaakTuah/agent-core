@@ -21,8 +21,8 @@ import { fetchCore, followsOf, greenMain, hostSaid, newestRelease, ownerOf, past
 import { started } from "./started.mjs";
 import { lookOnlyOnPath } from "./workflow-run.mjs";
 
-// (git, started here in the project's own clone, is looked for on the PATH alone, as are the
-// programs what it imports starts in this process: workflow-run.mjs)
+// (gh, started here in the project's own clone, is looked for on the PATH alone, as are the
+// programs what it imports starts in this process, git among them: workflow-run.mjs)
 lookOnlyOnPath();
 
 // The one issue it keeps: found again by this title among the issues the workflow itself opened.

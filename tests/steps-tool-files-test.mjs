@@ -292,7 +292,7 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
     const call = src.search(/^lookOnlyOnPath\(\);$/mu), start = src.search(/\b(execFileSync|spawnSync|execSync|spawn|execFile|exec)\s*\(/u);
     return !/^import \{ lookOnlyOnPath \} from "\.\/workflow-run\.mjs";$/mu.test(src) || call < 0 || (start >= 0 && start < call);
   });
-  ok(unguarded.length === 0, "each script run on a head not yet proven the repository's own calls the guard at its top, before it starts any program", unguarded.join(", "));
+  ok(unguarded.length === 0, "each script run on a head not yet proven the repository's own, and the sync and its look at whether the core moved, calls the guard at its top, before it starts any program", unguarded.join(", "));
 }
 
 done("steps-tool-files");
