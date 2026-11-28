@@ -19,8 +19,8 @@ Each waits on release 8's cut too.
 | --- | --- | --- |
 | #1118, #1113 to #1116, #1119 to #1121, #1109 to #1111 | rule builder; release 9, one PR each | |
 | #1098, #1133, #1356 | builder; release 9, one PR each | |
-| #1579 | builder; release 9; a check for a standing rule (`floor/topics/weaknesses.md`) | |
-| #1472 | builder; release 9 | #1510, on the same files |
+| #1579 | builder; release 9; the root fix `floor/topics/weaknesses.md` asks for, with its check; two security reviews (floor rule 3) | #1133, #1356, on the same files |
+| #1472 | builder; release 9 | #1510, #1579, on the same files |
 | #1475, #1476 | builder; release 9, one PR each | #1472, on the same files |
 | #1180, #1181 | rule builder; release 9, one PR each | |
 | #1182 | rule builder; release 9 | |
