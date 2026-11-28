@@ -48,7 +48,10 @@ export function leadsOut(root, at) {
   let top;
   // (the system's own realpath, which reads a `..` after a link from the folder the link reached, as a read does)
   try { top = fs.realpathSync.native(root); } catch { return true; }
-  for (let p = unfolded(at); ;) {
+  // (with no separator at its end, which would have a link that leads nowhere read as a folder that is not there)
+  let p = unfolded(at);
+  for (const { root: drive } = path.parse(p); p.length > drive.length && (p.endsWith(path.sep) || p.endsWith("/"));) p = p.slice(0, -1);
+  for (;;) {
     let real;
     try { real = fs.realpathSync.native(p); } catch {
       let found;

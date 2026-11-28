@@ -137,6 +137,16 @@ try {
   ok(vitestIs({ vitest: "./v.mjs" }) === V && vitestIs("v.mjs") === V && vitestIs({ vitest: "../../outside.mjs" }) === null && vitestIs({ vitest: "missing.mjs" }) === null && vitestIs("sub") === null && vitestAt(path.join(scratch, "none")) === null,
     "the project's vitest is the file its package.json names in its folder, or none");
   if (process.platform !== "win32") { fs.symlinkSync(SCRIPT, `${pkg}/l.mjs`); ok(vitestIs("l.mjs") === null, "nor one a link leads out of it"); }
+  // (a program its links take inside the folder, where node's own reading of the same links would take it out: the
+  // path given is the file judged, which node's reading leaves where it is)
+  if (process.platform !== "win32") {
+    fs.mkdirSync(`${pkg}/a/b/c`, { recursive: true }); fs.writeFileSync(`${pkg}/a/v.mjs`, ""); fs.writeFileSync(path.join(vt, "node_modules/v.mjs"), "");
+    fs.symlinkSync("a/b/c", `${pkg}/far`); fs.symlinkSync("far/../../v.mjs", `${pkg}/x.mjs`);
+    const given = vitestIs("x.mjs");
+    ok(given === "node_modules/vitest/a/v.mjs" && fs.realpathSync(path.join(vt, given)) === path.join(fs.realpathSync.native(vt), given),
+      "the program is given by the real place judged, so node runs that file and no other its own reading of the links would reach", String(given));
+    for (const f of ["far", "x.mjs"]) fs.rmSync(`${pkg}/${f}`);
+  }
   if (foldedLoop(pkg, "loop.mjs")) {
     fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin: "loop.mjs" }));
     const said = inTime(`import { vitestAt } from ${JSON.stringify(new URL("../scripts/stryker.mjs", import.meta.url).href)};\nconsole.log(JSON.stringify(vitestAt(${JSON.stringify(vt)})));`);

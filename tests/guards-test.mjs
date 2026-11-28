@@ -59,7 +59,7 @@ try {
   } finally { process.chdir(was); }
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
-    ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");
+    ok(leadsOut(project, path.join(project, "dangling.json")) && leadsOut(project, `${path.join(project, "dangling.json")}${path.sep}`), "a link that leads nowhere leads out, also named with a separator at its end");
     fs.symlinkSync(path.join(elsewhere, "other.json"), path.join(project, "..x.json"));
     const was = process.cwd();
     try {
