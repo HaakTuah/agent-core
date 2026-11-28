@@ -176,15 +176,16 @@ ok(legitAttached.status === 0 && /^attached: /u.test(legitAttached.out) && !/^- 
   // (the core's side installs its own packages, never taking those that stand beside the copy, which a branch can
   // fill: each package's entry there, as the core's loader finds it, made to leave a mark where the side's pure-sync.mjs
   // loads it, is loaded by none of it, the lock files the same; a tracked file there stands in the same folder. The
-  // copy's own attached.mjs loads them, as the copy's code does)
-  const mark = path.join(tmp, "copy-package-ran"), kept = new Map(), each = {};
-  for (const install of [".packages", ".packages/parser"]) {
-    const modules = path.join(p, "core", install), need = createRequire(path.join(modules, "package.json"));
-    each[install] = 0;
+  // copy's own attached.mjs loads them, as the copy's code does. Only those of .packages/: the side's run here starts
+  // no parser, so a mark planted in the parser's folder could never be left; that folder is closed by the same
+  // unpack, which is given no path of the copy's and installs every folder from the side's own lock files)
+  const mark = path.join(tmp, "copy-package-ran"), kept = new Map();
+  {
+    const modules = path.join(p, "core/.packages"), need = createRequire(path.join(modules, "package.json"));
     for (const name of Object.keys(JSON.parse(read(modules, "package.json")).dependencies ?? {})) {
       let at; try { at = need.resolve(name); } catch { continue; }
       if (!fs.realpathSync(at).startsWith(fs.realpathSync(path.join(modules, "node_modules")) + path.sep)) continue;
-      kept.set(at, fs.readFileSync(at)); each[install]++;
+      kept.set(at, fs.readFileSync(at));
       fs.writeFileSync(at, `if (/[\\\\/]side[\\\\/]scripts[\\\\/]pure-sync\\.mjs$/u.test(process.argv[1] ?? "")) process.getBuiltinModule("node:fs").writeFileSync(${JSON.stringify(mark)}, "ran");\n${kept.get(at)}`);
     }
   }
@@ -192,7 +193,7 @@ ok(legitAttached.status === 0 && /^attached: /u.test(legitAttached.out) && !/^- 
   for (const [at, was] of kept) fs.writeFileSync(at, was);
   const ran = fs.existsSync(mark);
   fs.rmSync(mark, { force: true });
-  ok(Object.values(each).every(n => n > 0) && !ran && !/^- the sync: /mu.test(planted.out), "  and the core's side loads none of the packages that stand beside the copy, the parser's among them, installing its own from its lock files", `${JSON.stringify(each)} ${ran}\n${planted.out}`);
+  ok(kept.size > 0 && !ran && !/^- the sync: /mu.test(planted.out), "  and the core's side loads none of the packages that stand beside the copy, installing its own from its lock files", `${kept.size} ${ran}\n${planted.out}`);
 }
 
 // the security-review check proves the sync pure itself, as GitHub runs its workflow on the sync's pull request (#99):
