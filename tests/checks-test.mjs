@@ -30,7 +30,7 @@ let n = 0;
 function project(files = {}) {
   const dir = path.join(tmp, `p${++n}`);
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of [...loadedBy("checks.mjs"), "core-path.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of loadedBy("checks.mjs")) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   // (the YAML package its reader of workflows loads, as the core's install leaves it: the lock file, npm's record of the
   // install and the package, from the core's own install, which its tests' job runs)
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/yaml"]) fs.cpSync(path.join(root, ".packages", f), path.join(dir, "core/.packages", f), { recursive: true });

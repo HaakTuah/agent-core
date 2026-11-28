@@ -29,7 +29,7 @@ function merged(dir) {
 {
   const dir = path.join(tmp, "checks");
   fs.mkdirSync(path.join(dir, "core/scripts"), { recursive: true });
-  for (const f of [...loadedBy("checks.mjs"), "core-path.mjs"]) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
+  for (const f of loadedBy("checks.mjs")) fs.copyFileSync(path.join(root, "scripts", f), path.join(dir, "core/scripts", f));
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/yaml"]) fs.cpSync(path.join(root, ".packages", f), path.join(dir, "core/.packages", f), { recursive: true });
   // (stand-ins that print the base they were given: the lookup, and NuGet's first look, which says nothing changed)
   write(dir, { "core/scripts/lookup.mjs": "console.log(`ran lookup.mjs LOOKUP_BASE=${process.env.LOOKUP_BASE}`);\n",
