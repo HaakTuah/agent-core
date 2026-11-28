@@ -12,7 +12,8 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { HOST_OWN, STAND_IN } from "../scripts/check.mjs";
+import { HOST_OWN, STAND_IN, context, eventFile } from "../scripts/check.mjs";
+import { ownCode } from "../scripts/checks.mjs";
 import { onPath } from "../scripts/workflow-run.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { mended } from "../scripts/mend.mjs";
@@ -60,6 +61,17 @@ ok(without.status === 0 && !/own\.yml/.test(without.out) && r.status === 1 && /o
   "with --own its own jobs run too, one failing or not run failing it, one whose condition fails skipped; without it, none", `${without.out}\n${r.out}`);
 ok(/host own\.yml\/deploy: it names an environment/.test(r.out) && !("own.yml/deploy" in verdicts) && verdicts["own.yml/secret"] === "passed",
   "a job of its own that names an environment, which deploys, is the host's own and not run, and its own jobs are given no secret", r.out);
+// (with --own-repository, and only with it, the core's workflows' steps read an event file that proves the code the
+// repository's own, so the NuGet check may restore: checks.mjs, ownCode)
+{
+  const head = git(dir, "rev-parse", "HEAD"), github = context({ root: dir, head, base: head, owner: "someone", title: "t", body: "", branch: "change", event: "pull_request" });
+  const steps = given => ({ GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: github.event_name, GITHUB_REPOSITORY: github.repository, ...eventFile(given, github.event, tmp) });
+  ok(ownCode({}, steps(true)) && !ownCode({}, steps(false)), "with --own-repository the steps' event file proves the code the repository's own; without it, nothing does", JSON.stringify(steps(true)));
+  const push = context({ root: dir, head, base: "", owner: "someone", title: "t", body: "", branch: "change", event: "push" });
+  const pushed = given => ({ GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: push.event_name, GITHUB_REPOSITORY: push.repository, ...eventFile(given, push.event, tmp) });
+  ok(!/repository|private/u.test(fs.readFileSync(steps(true).GITHUB_EVENT_PATH, "utf8")), "the event file holds only the pull request's head repository, so no step reads the stand-in's word on whether the repository is private", fs.readFileSync(steps(true).GITHUB_EVENT_PATH, "utf8"));
+  ok(ownCode({}, pushed(true)) && !ownCode({}, pushed(false)), "its push counts as the repository's own only with --own-repository too", JSON.stringify(pushed(false)));
+}
 const inside = check(dir, "--own", "--verdicts", path.join(dir, "verdicts.json"));
 ok(inside.status === 1 && mended(inside.out) && /--verdicts .* lies in the project.s own repository/.test(inside.out) && !fs.existsSync(path.join(dir, "verdicts.json")), "--verdicts in the project's own repository is refused, saying its mend, and nothing is written there", inside.out);
 // (a --verdicts path that is a link to nothing in the project is refused too: a write would follow it there)

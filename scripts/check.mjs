@@ -28,6 +28,11 @@
 //
 //   node core/scripts/check.mjs [--base <commit>] [--title <the pull request's title>] [--description <a file>]
 //                               [--branch <the branch's name, where none is checked out>] [--own] [--verdicts <a file>]
+//                               [--own-repository]
+// --own-repository says the clone is of a branch of the owner's own project, as the daily try and a release's trial
+// give it, never of another repository's change: the
+// steps of the core's workflows then read an event file that names the pull request's head repository as this one, so
+// the NuGet check may run a restore (checks.mjs, ownCode); without it they read none, and no restore runs.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -109,7 +114,7 @@ function main() {
   const o = options();
   // (a clone of the core installs none itself, as a copy does: #1245, point 6)
   if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(". Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }
-  const p = { ...project(o), own: o.own, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
+  const p = { ...project(o), own: o.own, ownRepository: o.ownRepository, verdicts: o.verdicts === null ? null : path.resolve(o.verdicts) };
   if (p.verdicts !== null) outside(p, o.verdicts);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "core-check-"));
   process.on("exit", () => { try { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* (left to the system's own cleaning) */ } });
@@ -184,9 +189,9 @@ function stopBehind(p, r, rest, tmp) {
 // The options given, each checked.
 function options() {
   const args = process.argv.slice(2);
-  for (const a of args) if (a.startsWith("--") && !["--base", "--title", "--description", "--branch", "--own", "--verdicts"].includes(a)) fail(`${a} is no option of this check.`, "use --base, --title, --description, --branch, --own or --verdicts, as the usage line at the top of scripts/check.mjs shows.");
+  for (const a of args) if (a.startsWith("--") && !["--base", "--title", "--description", "--branch", "--own", "--verdicts", "--own-repository"].includes(a)) fail(`${a} is no option of this check.`, "use --base, --title, --description, --branch, --own, --verdicts or --own-repository, as the usage line at the top of scripts/check.mjs shows.");
   const opt = name => { const i = args.indexOf(name); return i < 0 ? null : args[i + 1] ?? fail(`${name} is given no value.`, "give it one, as the usage line at the top of scripts/check.mjs shows."); };
-  return { base: opt("--base"), title: opt("--title"), description: opt("--description"), branch: opt("--branch"), own: args.includes("--own"), verdicts: opt("--verdicts") };
+  return { base: opt("--base"), title: opt("--title"), description: opt("--description"), branch: opt("--branch"), own: args.includes("--own"), verdicts: opt("--verdicts"), ownRepository: args.includes("--own-repository") };
 }
 
 // The pin of the core the manifest's text names (core-path.mjs): its own, or, where a library carries the core, the
@@ -256,8 +261,19 @@ function callers({ root, show, head, base }, tmp) {
   return kit;
 }
 
+// The event file the core's workflows' steps read, written in `tmp` only with --own-repository (checks.mjs, ownCode):
+// its variable, or none. It holds only what that proof reads, a pull request's head repository, so no step reads the
+// rest of the stand-in event (whether the repository is private, which it does not know) as the host's word.
+export function eventFile(ownRepository, event, tmp) {
+  if (!ownRepository) return {};
+  const file = path.join(tmp, "event.json");
+  const head = event.pull_request?.head?.repo?.full_name;
+  fs.writeFileSync(file, JSON.stringify(head ? { pull_request: { head: { repo: { full_name: head } } } } : {}));
+  return { GITHUB_EVENT_PATH: file };
+}
+
 // GitHub's context for the run: a pull request numbered 0 from the branch "change" into main, or a push to main.
-function context(p) {
+export function context(p) {
   const { root, head, base, owner, title, body } = p;
   let defaultBranch = "main";
   try { defaultBranch = git(root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD").replace(/^origin\//, ""); } catch { /* (none known: main) */ }
@@ -295,6 +311,7 @@ function runner(p, tmp) {
   const terms = process.env.PERSONAL_TERMS ?? "";
   const home = path.join(tmp, "home");
   fs.mkdirSync(home);
+  const event = eventFile(p.ownRepository, github.event, tmp), coreEnv = () => ({ ...stepEnv(home), ...event });
   const byCall = (file, id, job) => {
     const name = call.exec(String(job?.uses ?? ""))?.[1];
     const none = { failed: 0, ran: 0 };
@@ -309,7 +326,7 @@ function runner(p, tmp) {
     undescribed(name, inputs, p.described, `${file}/${id}`);
     const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, value(v, { PERSONAL_TERMS: terms })]));
     try {
-      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: stepEnv(home), workspace, uses, temp: tmp, machine: process.platform, sayUnread: true, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
+      return report(`${file}/${id}`, runWorkflow(called, { inputs, secrets, github: { ...github, workflow_ref: `${github.repository}/.github/workflows/${file}@${github.ref}` }, base: coreEnv(), workspace, uses, temp: tmp, machine: process.platform, sayUnread: true, stop: name === "core.yml" ? ownSteps(called) : null }), p.event);
     } catch (e) {
       verdicts[`${file}/${id}`] = "unread";
       warn(`FAIL ${file}/${id}: ${name} cannot be run from plain git here (${e.message}). ${MEND}run that check on the host meanwhile, and report it to the core (core/README.md, "Reporting to the core").`);

@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NOT_A_FILE, REGISTRY, check as checked, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "../scripts/nuget.mjs";
+import { NOT_A_FILE, REGISTRY, check as checked, formsIn, importPath, imported, importsOf, lockPackages, plainText, projectFilesByContent, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, globalForms, sourcesOf } from "../scripts/nuget.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { fetchAll } from "../scripts/nuget-fetch.mjs";
 import { packagesOf } from "../scripts/lookup.mjs";
@@ -242,7 +242,9 @@ ok(/src\/App\/App\.csproj names RestorePackagesPath/.test(names(["src/App/App.cs
   "a project file that sends its packages to another folder than the restore's fails, and so does a response file that gives every build options of its own");
 // a file an Import brings in that the check cannot find without the build, or that git does not know: reported, and
 // passes (#240)
-const reported = (tracked) => check({ ships: [], nuget: {} }, tmp, restore(), tracked);
+// (a project file and its lock file beside what each case reads: where a project has no .NET project file, no form is read)
+put("Probe.csproj", "<Project />"); put("packages.lock.json", lock({}));
+const reported = (tracked) => check({ ships: [], nuget: { tools: ["packages.lock.json"] } }, tmp, restore(), ["Probe.csproj", "packages.lock.json", ...tracked]);
 put("build/Deps.props", `<Project><Import Project="deps.xml" /><Import Condition="'$(A)' > '1'" Project='$(MSBuildThisFileDirectory)..\\shared\\more.config ' /><!-- <Import Project="old.xml" /> --><Imp<!-- -->ort Project="joined.xml" /><ImportGroup><Import Project="Sdk.props" Sdk="X" /><Import Project="$(MSBuildToolsPath)\\Microsoft.CSharp.targets" /><Import Project="../src/App/App.csproj.user" /></ImportGroup></Project>`);
 const importing = reported(["build/Deps.props"]);
 ok(importing.failures.length === 0 && importing.reports.length === 4 && importing.reports.some(x => x.includes("build/Deps.props imports deps.xml, a path outside the project, or no file of the project's that git knows")) && importing.reports.some(x => x.includes("imports $(MSBuildThisFileDirectory)..\\shared\\more.config,"))
@@ -695,6 +697,135 @@ user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/Ap
 ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
 
+// read for one project's restore (--lock), each into a folder of its own: what only another project's lock file names
+// is read where that one is restored, what this one's names must stand here, and no accepted version is found stale;
+// a lock file the config does not name fails, and the flag stands only beside --restored
+{
+  put(L, lock(direct(["Newtonsoft.Json", "13.0.3"]))); put(T, lock(direct(["Weak.Copy", "2.1.0"]))); put("checks/audit.json", JSON.stringify({ entries: [] }));
+  const cfg = { ships: [], audit: "checks/audit.json", nuget: { ships: [L], tools: [T], accepted: [accepted("Weak.Copy", "2.1.0", "LGPL-3.0-only", { ships: false })] } };
+  const one = (lockFile) => check(cfg, tmp, restore("Newtonsoft.Json@13.0.3"), TRACKED, process.env, { restored: true, lock: lockFile });
+  const whole = one(null), first = one(L), second = one(T), other = one("src/Other/packages.lock.json");
+  ok(first.failures.length === 0 && whole.failures.some(x => x.startsWith("Weak.Copy@2.1.0") && x.includes("not in the restore's folder")), "read for one project's restore, a package only another's lock file names is left to that one's read, where a read of the whole fails it", JSON.stringify({ first, whole }));
+  ok(second.failures.length === 1 && second.failures[0].startsWith(`Weak.Copy@2.1.0 (${T}): its manifest is not in the restore's folder`), "and one its own lock file names must stand in its folder", JSON.stringify(second));
+  ok(other.failures.some(x => x.startsWith("src/Other/packages.lock.json, the lock file this read is for, is none the config names. Mend: ")), "a lock file the config does not name fails", JSON.stringify(other));
+  const rsp = [...TRACKED, "Directory.Build.rsp"], tree = (lockFile) => check(cfg, tmp, restore("Newtonsoft.Json@13.0.3"), rsp, process.env, { restored: true, lock: lockFile }).failures.filter(x => x.startsWith("Directory.Build.rsp"));
+  ok(tree(null).length === 1 && tree(L).length === 0 && tree(T).length === 0, "what the tree alone fails is said by a read of the whole, and by no read for one project's restore", JSON.stringify([tree(null), tree(L)]));
+  // (a lock file's own faults: a read for one project's restore says its own lock file's, and leaves another's to that one's)
+  put(L, lock({ ...direct(["Newtonsoft.Json", "13.0.3"]), Odd: { type: "Odd" } })); put(T, lock({ ...direct(["Weak.Copy", "2.1.0"]), Odder: { type: "Odd" } }));
+  const kinds = (lockFile) => one(lockFile).failures.filter(x => x.includes("a kind of entry this check does not know"));
+  ok(kinds(L).length === 1 && kinds(L)[0].startsWith(L) && kinds(T).length === 1 && kinds(T)[0].startsWith(T) && kinds(null).length === 2, "read for one project's restore, its own lock file's faults are said and another's are not, which a read of the whole says", JSON.stringify([kinds(L), kinds(T)]));
+  put(L, lock(direct(["Newtonsoft.Json", "13.0.3"]))); put(T, lock(direct(["Weak.Copy", "2.1.0"])));
+  // (a tools manifest that is no file of bytes, a fault of the tree's: said by a read of the whole alone)
+  if (process.platform !== "win32") {
+    fs.mkdirSync(path.join(tmp, ".config"), { recursive: true }); fs.symlinkSync("/dev/null", path.join(tmp, ".config/dotnet-tools.json"));
+    const manifest = (lockFile) => check(cfg, tmp, restore("Newtonsoft.Json@13.0.3"), [...TRACKED, ".config/dotnet-tools.json"], process.env, { restored: true, lock: lockFile }).failures.filter(x => x.startsWith(".config/dotnet-tools.json is no file of bytes"));
+    ok(manifest(null).length === 1 && manifest(L).length === 0 && manifest(T).length === 0, "a tools manifest that is no file of bytes is said by a read of the whole, and by no read for one project's restore", JSON.stringify([manifest(null), manifest(L)]));
+    fs.rmSync(path.join(tmp, ".config"), { recursive: true });
+  }
+  const bare = spawnSync(process.execPath, [path.join(here, "nuget.mjs"), "checks/licences.json", "--packages", "x", "--lock", L], { cwd: tmp, encoding: "utf8" });
+  ok(bare.status === 1 && heard(bare.stdout + bare.stderr).includes("--lock was given without --restored"), "--lock without --restored is refused, saying its mend", bare.stdout + bare.stderr);
+}
+// what the read before the restore does not read in a build file: each target, task, and item that downloads a package
+// or names a pack the SDK downloads, whole, and an SDK taken from a package, by its tag; none in a comment
+{
+  const forms = formsIn(`<Project Sdk="Microsoft.NET.Sdk"><!-- <Target Name="Old" /> --><ItemGroup><PackageReference Include="A" Version="1.0.0" /><PackageDownload Include="B" Version="[1.0.0]" />
+    <packagedownload Include="C"><Version>[2.0.0]</Version></packagedownload><KnownFrameworkReference Include="F" TargetingPackName="P" /><DotNetCliToolReference Include="T" Version="1.0.0" /></ItemGroup>
+    <Target Name="Hook" BeforeTargets="CollectPackageDownloads"><!-- </Target> --><CreateItem Include="D"><Output TaskParameter="Include" ItemName="$(N)" /></CreateItem></Target>
+    <UsingTask TaskName="X" TaskFactory="RoslynCodeTaskFactory"><Task><![CDATA[ </UsingTask> ]]></Task></UsingTask><Import Project="Sdk.props" Sdk="S" Version="1.0.0" /><Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" /><Sdk Name="E" Version="2.0.0" /><Sdk Name="Microsoft.NET.Sdk.Web" /></Project>`);
+  ok(forms.length === 8 && forms[0] === '<PackageDownload Include="B" Version="[1.0.0]" />' && forms[1] === '<packagedownload Include="C"><Version>[2.0.0]</Version></packagedownload>' && forms[4].startsWith('<Target Name="Hook"') && forms[4].endsWith("</CreateItem></Target>") && forms[5].endsWith("]]></Task></UsingTask>")
+    && forms[6] === '<Import Project="Sdk.props" Sdk="S" Version="1.0.0" />' && forms[7] === '<Sdk Name="E" Version="2.0.0" />' && !forms.some(x => x.includes("Old") || x.includes("PackageReference") || x.includes("Microsoft.NET.Sdk")),
+    "a download, a pack named, a tool, a target and a task are read whole, an end tag in a comment or CDATA no end, and an SDK with a version by its tag; a package reference, an SDK of the SDK's own and a comment are none", JSON.stringify(forms));
+  ok(formsIn(`<Project><PropertyGroup><RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation><nugetconsoleprocessfilename>$(X)</nugetconsoleprocessfilename><RestoreSources>x</RestoreSources></PropertyGroup></Project>`).join("|")
+    === "<RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>|<nugetconsoleprocessfilename>$(X)</nugetconsoleprocessfilename>", "the settings that turn the restore to the way that starts a process a property names are each read whole, whatever their value or case");
+  ok(formsIn(`<Project><PropertyGroup><RestoreTaskAssemblyFile>x.dll</RestoreTaskAssemblyFile><MSBuildProjectExtensionsPath>ext/</MSBuildProjectExtensionsPath><baseintermediateoutputpath>o/</baseintermediateoutputpath><ArtifactsPath>a/</ArtifactsPath><OutputPath>bin/</OutputPath></PropertyGroup></Project>`).length === 4,
+    "the setting that names what the restore loads, and those that move the folder a build imports a project's generated files from, are each read whole, whatever their value or case");
+  ok(formsIn(`<Project Sdk="Microsoft.NET.Sdk;My.Sdk/1.0.0">`).length === 1 && formsIn(`<Project><Target Name="T"><Exec Command="x" />`).join() === '<Target Name="T"><Exec Command="x" />' && formsIn(`<Project><Target Name="A"><Target Name="B" /></Target><Target Name="C" /></Project>`).length === 2,
+    "a project's SDK from a package is one, a target with no end is read to the file's, and one inside another is part of it");
+  ok(formsIn(`<Project><ItemGroup><_PackageToDownload Include="P" Version="1.0.0" /></ItemGroup><Import Project="Sdk.props" Sdk="S" MinimumVersion="1.0" /></Project>`).length === 2, "an item the SDK downloads by, and an Import of an SDK by its least version, are forms");
+  const json = (text) => globalForms(Buffer.from(text));
+  ok(json(`{ "sdk": { "version": "8.0.100", "rollForward": "latestFeature", "allowPrerelease": false } }`).length === 0 && json(`{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`).join() === 'msbuild-sdks: {"My.Sdk":"1.0.0"}'
+    && json(`{ "sdk": { "version": "10.0.100", "paths": [".dotnet", "$host$"], "Version": "x" } }`).join("|") === 'sdk.paths: [".dotnet","$host$"]|sdk.Version: "x"' && json(`{ "SDK": {}, "sdk": "x" }`).join("|") === 'SDK: {}|sdk: "x"',
+    "a global.json's every key but the SDK's own version, roll-forward and pre-release, by their exact names, is a form, its value whole");
+  const whole = json(`{ // a comment\n "sdk": {} }`);
+  ok(whole.length === 1 && /^a global\.json this check does not read whole, its bytes' sha256 [0-9a-f]{64}$/.test(whole[0]) && json(`{ // a comment\n "sdk": {}, "msbuild-sdks": {} }`)[0] !== whole[0]
+    && json(`{ "sdk": {}, "sdk": { "paths": ["x"] } }`)[0].startsWith("a global.json this check does not read whole") && json(`{ "a": { "k": 1, "k": 2 } }`)[0].startsWith("a global.json this check does not read whole")
+    && globalForms(Buffer.from([0xff, 0xfe, 0x7b, 0])).length === 1 && globalForms(NOT_A_FILE).join() === "a global.json this check does not read whole, no file of bytes" && json(`{ "a": ["k", "k"], "b": "{\\"k\\": 1, \\"k\\": 2}" }`).length === 2,
+    "one not JSON, not plain UTF-8, no file, or writing a key twice in one object is one line naming its bytes' hash, so any change to it is another line");
+  ok(throws(() => nugetConfig({ nuget: { unread: [] } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [] } } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [" "] } } })) && nugetConfig({ nuget: { unread: { "a.props": ["imports x"] } } }).unread["a.props"].length === 1,
+    "the config's \"nuget.unread\" is a map from a file to the lines of the forms declared there");
+}
+// with a base: a form the pull request adds fails with its mend; one the base held in the same file, or one the
+// config's "nuget.unread" declares word for word, is reported and passes; a line declared that no form matches fails;
+// with no base, each is reported; after the restore, which the read before it held them in, none is read
+{
+  const DBP = "Directory.Build.props", tracked = ["src/App/App.csproj", L, DBP, "global.json"];
+  // (the failures of the forms alone: the lock file this repository holds by now is no part of the case)
+  const formCheck = (unread, base = "HEAD") => { const x = check({ ships: [], nuget: { tools: [L], ...(unread ? { unread } : {}) } }, repo, restore(), tracked, process.env, { base, baseConfig: null, fetched: true }); return { ...x, failures: x.failures.filter(f => !f.startsWith(L)) }; };
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup></Project>`); inRepo("global.json", `{ "sdk": { "version": "8.0.100" } }`); git("add", "-A"); git("commit", "-q", "-m", "a build file");
+  const DOWNLOAD = `<PackageDownload Include="Some.Pkg" Version="[1.0.0]" />`, IMPORT = `<Import Project="$(Elsewhere)/more.props" />`;
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`); inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`);
+  let r = formCheck();
+  // (each form's line, as its failure prints it, which declares it)
+  const first = r, lineOf = (text) => first.failures.map(x => { const m = /in "nuget\.unread" \(its "nuget": \{ "unread": \{ "<file>": \[<lines>\] \} \}\), under "[^"]+", this exact line: (".*")\. The line stands for /.exec(x); return m && JSON.parse(m[1]); }).find(l => l?.startsWith(text));
+  ok(r.failures.some(x => x.startsWith(`${DBP} holds what the read before the restore does not follow`) && x.includes(DOWNLOAD) && x.includes('"nuget.unread"')) && r.failures.some(x => x.startsWith(`${DBP} imports $(Elsewhere)/more.props, a file whose path this check cannot know without the build`))
+    && r.failures.some(x => x.startsWith('global.json holds what the read before the restore does not read') && x.includes('msbuild-sdks: {"My.Sdk":"1.0.0"}')) && /^<PackageDownload Include="Some.Pkg" Version="\[1\.0\.0\]" \/> \(its text's sha256 [0-9a-f]{64}\)$/.test(lineOf("<PackageDownload")),
+    "a download, an Import the check cannot follow and an SDK from a package that the pull request adds each fail, saying the line that declares it", JSON.stringify(r));
+  const atPath = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), tracked, process.env, { base: "HEAD", baseConfig: null, fetched: true, configPath: "checks/licences.json" }).failures.filter(x => !x.startsWith(L));
+  ok(atPath.length === 3 && atPath.every(x => x.includes(`add to checks/licences.json, the licence check's config, in "nuget.unread"`) && x.includes("The line stands for the form as it is written, so any change to it needs a line of its own")), "each names the config's file it is declared in", JSON.stringify(atPath));
+  r = formCheck(null, null);
+  ok(r.failures.length === 0 && r.reports.filter(x => x.includes("(reported, and passes)")).length >= 3, "with no base, each is reported and passes", JSON.stringify(r));
+  const after = check({ ships: [], nuget: { tools: [L], unread: { "src/Gone.props": ["imports x"] } } }, repo, restore(), tracked, process.env, { base: null, baseConfig: null, restored: true });
+  ok(!after.failures.some(x => x.includes("nuget.unread")) && !after.reports.some(x => x.includes(DOWNLOAD) || x.includes("more.props") || x.includes("My.Sdk")), "after the restore, no form is read again, nor a line declared", JSON.stringify(after));
+  const DECLARED = lineOf("<PackageDownload");
+  r = formCheck({ [DBP]: [DECLARED.replace(" ", "  "), `imports  $(Elsewhere)/more.props`], "global.json": ['msbuild-sdks: {"My.Sdk":"1.0.0"}'] });
+  ok(r.failures.length === 0 && r.reports.filter(x => x.includes(`(declared in the config's "nuget.unread": reported, and passes)`)).length === 3, "each declared word for word, its blanks aside, is reported and passes", JSON.stringify(r));
+  r = formCheck({ [DBP]: [DECLARED, DECLARED, "imports $(Elsewhere)/more.props"], "global.json": ['msbuild-sdks: {"My.Sdk":"1.0.0"}'], "src/Gone.props": ["imports x"], toString: ["imports y"] });
+  ok(r.failures.filter(x => x.startsWith(`the config's "nuget.unread" declares, for`)).length === 3 && r.failures.every(x => x.startsWith(`the config's "nuget.unread" declares, for`)), "a line declared that no form matches fails, one declared twice for one form and one for a file with none, whatever its name", JSON.stringify(r));
+  // (a form whose text differs from the one declared only in a line break where a blank stood is another form)
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD.replace(" Version", "\nVersion")}</ItemGroup>${IMPORT}</Project>`);
+  r = formCheck({ [DBP]: [DECLARED, "imports $(Elsewhere)/more.props"], "global.json": ['msbuild-sdks: {"My.Sdk":"1.0.0"}'] });
+  ok(r.failures.some(x => x.includes("Some.Pkg") && x.includes("Mend: ")) && r.failures.some(x => x.includes(`declares, for ${DBP}, ${DECLARED}`)), "a form that differs from the one declared only where a blank became a line break is another form, and fails", JSON.stringify(r));
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`);
+  git("add", "-A"); git("commit", "-q", "-m", "forms");
+  r = formCheck();
+  ok(r.failures.length === 0 && r.reports.filter(x => x.includes("held before this check read it")).length === 3, "the same forms, as the base held them in the same files: reported, and pass", JSON.stringify(r));
+  const TARGET = `<Target Name="Hook" BeforeTargets="CollectPackageDownloads"><ItemGroup><PackageDownload Include="Other.Pkg" Version="[2.0.0]" /></ItemGroup></Target>`;
+  inRepo(DBP, `<Project><PropertyGroup><X>2</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}${TARGET}</Project>`);
+  r = formCheck();
+  ok(r.failures.length === 1 && r.failures[0].includes(TARGET) && r.reports.filter(x => x.includes("held before this check read it")).length === 3, "a target the pull request adds beside them fails, read whole, while what the base held still passes", JSON.stringify(r));
+  // (a form moved to another file, a second copy of one the base held, and a setting of the SDK's beyond its version,
+  // each fail; what the base held stays held)
+  const OTHER = "build/Other.props", withOther = [...tracked, OTHER];
+  const otherCheck = () => { const x = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), withOther, process.env, { base: "HEAD", baseConfig: null, fetched: true }); return x.failures.filter(f => !f.startsWith(L)); };
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup>${IMPORT}</Project>`); inRepo(OTHER, `<Project><ItemGroup>${DOWNLOAD}</ItemGroup></Project>`);
+  let fails = otherCheck();
+  ok(fails.length === 1 && fails[0].startsWith(`${OTHER} holds`) && fails[0].includes("Some.Pkg"), "a form moved to another file fails there", JSON.stringify(fails));
+  fs.rmSync(path.join(repo, OTHER));
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`);
+  fails = formCheck().failures;
+  ok(fails.length === 1 && fails[0].includes("Some.Pkg"), "a second copy of a form the base held once fails, the first held", JSON.stringify(fails));
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`);
+  inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" }, "sdk": { "version": "10.0.100", "paths": [".dotnet", "$host$"] } }`);
+  fails = formCheck().failures;
+  ok(fails.length === 1 && fails[0].startsWith("global.json holds") && fails[0].includes('sdk.paths: [".dotnet","$host$"]'), "a global.json's folder of SDKs that the pull request adds fails, its SDK's version passing", JSON.stringify(fails));
+  inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`);
+  // (where the project has no .NET project file, no restore runs: no form is read)
+  inRepo(DBP, `<Project><Target Name="New" /></Project>`); git("rm", "-q", "--cached", "src/App/App.csproj");
+  const noProject = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [L, DBP], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
+  git("add", "src/App/App.csproj");
+  ok(noProject.length === 0, "with no .NET project file, a form the pull request adds fails nothing", JSON.stringify(noProject));
+  inRepo(DBP, `<Project><!DOCTYPE p><X /></Project>`);
+  inRepo("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "x">]><Project />`);
+  r = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, "build/Typed.props"], process.env, { base: "HEAD", baseConfig: null, fetched: true });
+  ok(r.failures.some(x => x.startsWith("build/Typed.props has a document type, so this check does not read its Imports, nor what they bring in. Mend: ")), "a build file with a document type that the pull request adds fails", JSON.stringify(r));
+  fs.rmSync(path.join(repo, "build/Typed.props")); fs.rmSync(path.join(repo, DBP)); fs.rmSync(path.join(repo, "global.json")); git("add", "-A"); git("commit", "-q", "-m", "no forms");
+}
+// a file whose root element is a Project, in UTF-16 or UTF-32 with no byte-order mark, which a reader of XML knows by
+// its first "<" and the NULs beside it, is read as one by what it is, so that the first look diffs it too
+put("build/wide.xml", Buffer.from(`<?xml version="1.0"?><Project />`, "utf16le")); put("build/wider.xml", Buffer.from(`<?xml version="1.0"?><Project />`, "utf16le").swap16());
+put("build/widest.xml", Buffer.concat([...`<?xml version="1.0"?><Project />`].map(ch => { const b = Buffer.alloc(4); b.writeUInt32LE(ch.codePointAt(0)); return b; })));
+ok(projectFilesByContent(tmp, ["build/wide.xml", "build/wider.xml", "build/widest.xml"]).length === 3, "a project in UTF-16 or UTF-32 with no byte-order mark is read as one by what it is");
+
 {
   // (read once, however many comments it holds: past a second here, it would read the text again for each)
   const from = Date.now(), many = expression(nuspec(`${"<!-- a note -->".repeat(50000)}<license type="expression">MIT</license>`));
@@ -721,6 +852,18 @@ if (process.platform !== "win32") {
   ok(both.status === 1 && /--restored and --fetched were both given.*Mend: /.test(both.out), "--restored beside --fetched is refused, saying its mend", both.out);
   ok(after.status === 0 && after.lines.length > 0 && after.named.length === 0 && before.status === 0 && before.named.length > 0,
     "after a restore (--restored), no git command the check runs names a parent of the merge; without it, the base is read", JSON.stringify({ after: after.named, before: before.named, out: after.out }));
+}
+if (process.platform !== "win32") {
+  // (the script whole, on a merge as a pull request's checkout holds it, its base the merge's first parent: a target the
+  // base held passes, reported, where the pull request changes another file, as on a sync or a project's daily try;
+  // one the pull request adds fails)
+  const CS = "src/App/App.csproj", gen = `<Target Name="Gen" BeforeTargets="Build"><Exec Command="echo" /></Target>`;
+  inRepo(CS, `<Project Sdk="Microsoft.NET.Sdk">${gen}</Project>`); git("add", "-A"); git("commit", "-q", "-m", "a target at the base");
+  const merged = (name, write) => { git("switch", "-q", "-c", name); write(); git("add", "-A"); git("commit", "-q", "-m", name); git("switch", "-q", "main"); git("merge", "-q", "--no-ff", "-m", `merge ${name}`, name); return run("checks/licences.json", "--packages", json); };
+  const held = merged("other-file", () => inRepo("README.md", "another change\n"));
+  ok(held.status === 0 && held.out.includes(`REPORT: ${CS} holds what the read before the restore does not follow`) && held.out.includes("held before this check read it"), "on a merge, a target the base held, beside a change to another file, passes reported", held.out);
+  const added = merged("new-target", () => inRepo(CS, `<Project Sdk="Microsoft.NET.Sdk">${gen}<Target Name="More" AfterTargets="Build" /></Project>`));
+  ok(added.status === 1 && /<Target Name="More" AfterTargets="Build" \/> \(its text's sha256 [0-9a-f]{64}\)\. Mend: /.test(added.out), "and a target the pull request adds beside it fails, saying its mend", added.out);
 }
 ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);

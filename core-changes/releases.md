@@ -25,8 +25,8 @@ report: the kinds `trial` and `audit`, the paths `own-look.yml`, `release*`, `tr
   by `tests/workflows-test.mjs`, for the runs read on it. **Each release is tried on a real project first** (#1084). By default, before the `release` workflow
   is started, the orchestrator has a builder at the strongest tier try the release on a copy of a project that takes the
   core and whose owner allows it, the owner's own as `scripts/state-report.mjs --projects` finds them, read-only,
-  nothing written there: its checks run as on a pull request (`scripts/check.mjs --base <its main> --own --verdicts <a
-  file outside every repository>`) once before the update, as a baseline, and again after it, the sync between; where
+  nothing written there: its checks run as on a pull request (`scripts/check.mjs --base <its main> --own --own-repository --verdicts <a
+  file outside every repository>`, the flag only for the owner's own projects, and only where the copy's `check.mjs` knows it) once before the update, as a baseline, and again after it, the sync between; where
   the copy holds no `check.mjs`, or one without `--verdicts`, the baseline is taken with the release's, from a clone of
   the core at the release's commit, run from the project's clone, the core's clone outside it, its verdicts still
   outside every repository, and the record says which way each was taken (#1244); each passed both, failed both

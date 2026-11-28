@@ -2,7 +2,7 @@
 // core's scheduled look (.github/workflows/own-look.yml) try the core at main's newest commit whose checks all passed
 // (releases.mjs, greenMain) on each of the owner's own projects that take it, as a release's trial does (#1084): each
 // project alone, on a fresh runner of its own that holds no other project's clone, in a scratch clone, its checks run
-// before the sync and after it (check.mjs --own --verdicts), the two set side by side as the trial sets them
+// before the sync and after it (check.mjs --own --own-repository --verdicts), the two set side by side as the trial sets them
 // (release-trial.mjs, compared), and a project held where the trial's record would hold a cut (trialAt). Nothing is
 // written to any project: the clone holds no sign-in, nothing is pushed, and no draft is opened (the drafts stay at a
 // release's trial, #1334). A project of another owner is never tried here. What it prints, writes and files is counts
@@ -183,7 +183,9 @@ export function tryOne(at, core, sha, out, run = runLogged, tools = toolsFor, pr
   // (CORE_PRIVATE: the sync, given no sign-in, would read it from GitHub's API with none, which a shared runner's limit
   // sometimes refuses; it takes the host's answer the listing read, as its mend says: #1561)
   const env = { ...bare(), ...tools(at, log), CORE_PRIVATE: priv }, go = (cmd, args) => run(cmd, args, at, log, env);
-  const check = (script, file) => go(process.execPath, [script, "--base", main, "--own", "--verdicts", file]);
+  // (--own-repository, where the script knows it: the clone is of the owner's own project, so its NuGet check may restore)
+  const knows = script => { try { return fs.readFileSync(script, "utf8").includes("--own-repository"); } catch { return false; } };
+  const check = (script, file) => go(process.execPath, [script, "--base", main, "--own", ...(knows(script) ? ["--own-repository"] : []), "--verdicts", file]);
   const before = path.join(out, "before.json"), after = path.join(out, "after.json");
   check(scripts.before, before);
   if (!readJson(before)) return { came: "untried", why: "beforeUnread" };

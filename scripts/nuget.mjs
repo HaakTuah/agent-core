@@ -17,6 +17,24 @@
 //     or a tools manifest that does fails as well, and is never read). A file so brought in, or one not plain UTF-8 or
 //     no file, read only lately, is reported where the base held it as it stands, and brought it in by the same files
 //     (core archive 207);
+//   - that the project holds nothing the read before the restore does not read: in a build file, a target or a task,
+//     an item that downloads a package or names a pack the SDK downloads (PackageDownload, _PackageToDownload,
+//     DotNetCliToolReference, the Known* items), an SDK taken from a package (a project's or an Import's named with a
+//     version, an Sdk element with one), a setting that turns the restore to the way that starts a process a property
+//     names (RestoreUseStaticGraphEvaluation, NuGetConsoleProcessFileName), names what the restore loads
+//     (RestoreTaskAssemblyFile) or moves the folder a build imports a project's generated files from
+//     (MSBuildProjectExtensionsPath, BaseIntermediateOutputPath, ArtifactsPath), whatever their value, or an Import or
+//     such a property it cannot follow; in a global.json, anything but the SDK's own version, roll-forward and pre-release
+//     ("msbuild-sdks", "sdk.paths" and the like). Each is a line that names it by its text's whole hash, so that any
+//     change to it is another line, and fails but where the base held it in the same file (by its lines, counted, as
+//     an audit's "fetches"), or the config's "nuget.unread" declares it word for word, as the failure prints it, with
+//     the exact line to add; a line declared that no form matches fails. None of this is read where the project has no
+//     .NET project file. The declaration is read from the config as
+//     the pull request holds it, as an audit entry's "fetches" is read from the audit it holds: one a pull request
+//     adds stands in its diff, in a protected file, for the reviews to read. A document type fails but where its
+//     file stands as the base held it, and is never declared. An Import it cannot follow, held or declared, stands for
+//     whatever file its path comes to lead to, not only the one the reviews read. The copy of the core is left out of
+//     every form: what a pull request changes there is the copies check's;
 //   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
@@ -44,26 +62,38 @@
 //   - what the restore brought and no lock file read here names (a targeting pack, a PackageDownload, an SDK a project
 //     file names): its licence is held to the list for what ships all the same, by its manifest, the audit or a yes.
 // What it does not hold: that the lock files are what a restore gives today (the workflow that runs this,
-// .github/workflows/nuget.yml, restores each project file this script lists with --locked-mode first, which fails
-// where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
+// .github/workflows/nuget.yml, restores each project file this script lists with --locked-mode first, each into a
+// folder of its own, NuGet's caches and scratch folder inside it, read with --lock and taken out before the next
+// project's restore, which fails where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
 // project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
 // restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
 // names goes unseen, and such a folder stands in the pull request for the reviews to see); what a file an Import or
 // such a property brings in sets where the check cannot know which file it is without the build (a property, a
 // wildcard, an SDK's, a property's value that does not start at its own file's folder), or where git does not know it
-// (each such Import or property is reported, and passes); whether the owner said what "accepted"
+// (each such Import or property is one of the forms above); whether the owner said what "accepted"
 // quotes, which the reviews hold, the config being a protected file; a project of another kind than the three above;
 // a tool a manifest of dotnet's names (dotnet-tools.json, in .config/ or in any folder), which no restore brings, save
 // before the restore (--fetched, below); and what no lock file names at all (a tool a script installs, a font, an
 // image), which the licence check's audit and scan hold. A restore runs the project's own build files, a pull
 // request's too, which could change anything in the job this runs in, this script and the manifests included: so the
-// licences of what the lock files name are read before it too (--fetched), and what a pull request does to its
-// project files is the reviews' to read, as with every check that builds. After it (--restored) nothing of git's is
-// read for the base, since the restore could have rewritten what git reads it by (its config, its attributes, its
-// refs): each comparison with the base was made before the restore, by the read with --fetched on the same checkout
-// or, where that was left out, by the workflow's first look, whose base is the merge's first parent, as this script's
-// is, and which found nothing this reads changed; so what the base held stands as held. The flag is sound only after
-// one of those, and is refused beside --fetched; git's list of the tracked files is still read after the restore.
+// licences of what the lock files name, and the build files as committed, are read before it too (--fetched), and
+// what a pull request does to its project files is the reviews' to read, as with every check that builds. After it
+// (--restored) nothing of git's is read for the base, since the restore could have rewritten what git reads it by
+// (its config, its attributes, its refs): each comparison with the base was made before the restore, by the read with
+// --fetched on the same checkout, whose base is the merge's first parent, as this script's is; so what the base held
+// stands as held, and the forms above are not read again. The flag is sound only after that read, and is refused
+// beside --fetched; git's list of the tracked files is still read after the restore, in the same step as the restore,
+// holding nothing the restore did not. What a target or a task the base held, or the config declares, writes once the
+// restore runs it, this script and the manifests included, the read after the restore reads as it finds it, and so
+// does it what such a target or task does where a pull request brings it into play (a condition turned, an Import
+// added), each running as the base wrote it or the config declares it; a file such a target or task runs (a script, a
+// program), which a pull request changes, runs at the first look's own build too, before the read, where nothing else
+// the look reads changed, and gains there nothing over what it may write after the read, since nothing the read judges
+// differs from the base's. So too what a folder outside the checkout holds that a setting the base held points a build
+// at. These are known limits for a pull request of the repository's own, whose author can already push: the forms
+// above list the settings known to steer how the restore runs or what it loads, by name, and one not yet known, or a
+// file of the project's that such a setting or the SDK starts, is not read. A pull request from another repository
+// runs no restore at all (checks.mjs, the part nuget, runs none without proof that the code is the repository's own).
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
@@ -75,8 +105,12 @@
 //
 //   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--restored] [--advisory]
 //                                               with --restored, run after a restore that the read with --fetched on
-//                                               the same checkout, or the workflow's first look, came before: nothing
-//                                               of git's read for the base
+//                                               the same checkout came before: nothing of git's read for the base; and
+//   ... --restored --lock <the lock file of the one project restored into that folder>
+//                                               the read after one project's restore, each into a folder of its own:
+//                                               what only another project's lock file names is read where it is
+//                                               restored, no accepted version is found stale, and what the tree
+//                                               alone says, which the read with --fetched said, is not said again
 //   node core/scripts/nuget.mjs <config> --packages <the folder nuget-fetch.mjs filled> --fetched [--advisory]
 //                                               the same, before the restore: the licences of what the lock files name,
 //                                               and of the tools a manifest of dotnet's names, read from files no pull
@@ -93,15 +127,19 @@
 // The config is the licence check's (licences.mjs), with one key more, "nuget": { "ships": the lock files whose
 // packages ship, "tools": those of projects that only run (tests, tools), "accepted": the owner's yeses, as
 // licence-yes.mjs writes one for a package, named "<Id>@<version>", "sources": where packages may come from beside
-// NuGet's own registry, each an https address or a folder of the project's own that holds the package files }. With
+// NuGet's own registry, each an https address or a folder of the project's own that holds the package files,
+// "unread": the forms a build file holds that the read before the restore does not read, declared, a map from each
+// file, as git lists it, to their lines, each as the check's failure prints it, its blanks collapsed }. With
 // --advisory it says what it would fail and passes, for a project where the check itself is at fault, while that is
 // mended.
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { acceptedList, yesFaults } from "./licence-yes.mjs";
 import { asText, leadsOut, oneLine, parseBounded } from "./guards.mjs";
+import { takeEach } from "./licence-audit-fetches.mjs";
 import { MOVED_OFF, baseOf, configAt, licenceOk, loadConfig, movedOff, policy, textAt } from "./licences.mjs";
 import { copyAside, projectAt, regularText } from "./core-path.mjs";
 import { guard } from "./mend.mjs";
@@ -198,6 +236,91 @@ function passedOver(text, i) {
   }
   return null;
 }
+// What the read before the restore does not read in a build file, each as its text: each target, task, and item that
+// downloads a package or names a pack the SDK downloads, whole, and the tag of a project or an Import whose SDK comes
+// from a package. One with no end is read to the file's.
+// (and the two settings that turn the restore to the way that starts a process a property names, whatever their value)
+const WHOLE = /^(?:target|usingtask|packagedownload|_packagetodownload|dotnetclitoolreference|known[a-z0-9_.-]*|restoreusestaticgraphevaluation|nugetconsoleprocessfilename|restoretaskassemblyfile|msbuildprojectextensionspath|baseintermediateoutputpath|artifactspath)$/iu;
+const collapsed = (s) => s.replace(/\s+/gu, " ").trim();
+// (a form as a line: its text, its blanks collapsed so that it reads on one line, and the hash of its text as written,
+// line endings aside, so that a line stands for that text alone)
+const hashOf = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const formLine = (text) => `${collapsed(text)} (its text's sha256 ${hashOf(text.replace(/\r\n?/gu, "\n"))})`;
+export function formsIn(text) {
+  const found = [];
+  for (let i = text.indexOf("<"); i >= 0 && i < text.length; i = text.indexOf("<", i)) {
+    const past = passedOver(text, i);
+    if (past !== null) { if (past < 0) break; i = past; continue; }
+    const tag = /^<([A-Za-z_][A-Za-z0-9_.-]{0,99})(?![A-Za-z0-9_.:-])/u.exec(text.slice(i, i + 102));
+    if (!tag) { i++; continue; }
+    const end = tagEnd(text, i + tag[0].length);
+    if (WHOLE.test(tag[1])) {
+      const close = end >= text.length ? text.length : text[end - 1] === "/" ? end + 1 : elementEnd(text, end + 1, tag[1]);
+      found.push(text.slice(i, close));
+      i = close;
+      continue;
+    }
+    if (sdkFromPackage(tag[1], text.slice(i + tag[0].length, end))) found.push(text.slice(i, end + 1));
+    i = end + 1;
+  }
+  return found;
+}
+// (where the element `name`, whose start tag ends before `from`, ends: past its own end tag, one of the same name
+// inside it counted, comments, CDATA and processing instructions passed over; the file's end where none comes)
+function elementEnd(text, from, name) {
+  const lower = name.toLowerCase();
+  let depth = 1;
+  for (let i = text.indexOf("<", from); i >= 0; i = text.indexOf("<", i)) {
+    const past = passedOver(text, i);
+    if (past !== null) { if (past < 0) return text.length; i = past; continue; }
+    const tag = /^<(\/?)([A-Za-z_][A-Za-z0-9_.-]{0,99})(?![A-Za-z0-9_.:-])/u.exec(text.slice(i, i + 103)), end = tagEnd(text, i + 1);
+    if (end >= text.length) return text.length;
+    if (tag && tag[2].toLowerCase() === lower) { if (tag[1]) { if (--depth === 0) return end + 1; } else if (text[end - 1] !== "/") depth++; }
+    i = end + 1;
+  }
+  return text.length;
+}
+// (a Project's or an Import's SDK named with a version, or an Sdk element's, which MSBuild resolves from a package)
+function sdkFromPackage(name, attributeText) {
+  const lower = name.toLowerCase();
+  if (lower !== "project" && lower !== "import" && lower !== "sdk") return false;
+  const at = new Map([...attributeText.matchAll(ATTRIBUTE)].map((a) => [a[1].toLowerCase(), xmlValue(a[2] ?? a[3])]));
+  const sdk = at.get(lower === "sdk" ? "name" : "sdk");
+  return sdk !== undefined && (sdk.includes("/") || (lower !== "project" && (at.has("version") || at.has("minimumversion"))));
+}
+/** What a global.json holds beyond the SDK's own version, roll-forward and pre-release (each by its exact name, under
+ *  "sdk"), each a line, its key and its value: an SDK MSBuild takes from a package ("msbuild-sdks"), a folder of SDKs
+ *  ("sdk.paths"), anything else. One this check does not read whole (no file of bytes, not plain UTF-8, not JSON, a key
+ *  written twice, which another reader may take otherwise) is one line, naming its bytes by their hash, so that any
+ *  change to it is another line. */
+const SDK_OWN = new Set(["version", "rollForward", "allowPrerelease"]);
+export function globalForms(bytes) {
+  if (bytes === null) return [];
+  const text = bytes === NOT_A_FILE ? null : plainText(bytes);
+  let json = null;
+  try { if (text !== null && !keyTwice(unmarked(text))) json = parseBounded(unmarked(text)); } catch { /* (not JSON: read as bytes alone) */ }
+  if (!json || typeof json !== "object" || Array.isArray(json)) return [`a global.json this check does not read whole, ${bytes === NOT_A_FILE ? "no file of bytes" : `its bytes' sha256 ${hashOf(bytes)}`}`];
+  const sdk = json.sdk && typeof json.sdk === "object" && !Array.isArray(json.sdk) ? json.sdk : null;
+  return [...Object.entries(json).filter(([k]) => k !== "sdk" || !sdk), ...Object.entries(sdk ?? {}).filter(([k]) => !SDK_OWN.has(k)).map(([k, v]) => [`sdk.${k}`, v])]
+    .map(([k, v]) => collapsed(`${k}: ${JSON.stringify(v)}`));
+}
+// (whether a JSON text writes a key twice in one object; the text is read as JSON's strings and brackets alone)
+function keyTwice(text) {
+  const open = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{") open.push(new Set());
+    else if (ch === "[") open.push(null);
+    else if (ch === "}" || ch === "]") open.pop();
+    else if (ch === '"') {
+      const end = /^"(?:[^"\\]|\\.)*"/su.exec(text.slice(i))?.[0] ?? text.slice(i);
+      const keys = open.at(-1), next = text.slice(i + end.length).replace(/^[ \t\r\n]+/u, "")[0];
+      if (keys && next === ":") { let k = end; try { k = JSON.parse(end); } catch { /* (no string: no JSON either) */ } if (keys.has(k)) return true; keys.add(k); }
+      i += end.length - 1;
+    }
+  }
+  return false;
+}
 // (where a tag's attributes, read from `from`, end: at its ">", one inside a quoted value passed over)
 function tagEnd(text, from) {
   let end = from, quote = "";
@@ -205,8 +328,8 @@ function tagEnd(text, from) {
   return end;
 }
 // (the files an Import's attributes name in its Project, each with whether it names an SDK)
+const ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
 function importsIn(attributeText, found) {
-  const ATTRIBUTE = /(?<![A-Za-z0-9_.:-])([A-Za-z_][A-Za-z0-9_.:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/gu;
   const attributes = [...attributeText.matchAll(ATTRIBUTE)], sdk = attributes.some((a) => a[1].toLowerCase() === "sdk");
   for (const a of attributes) if (a[1].toLowerCase() === "project") for (const x of xmlValue(a[2] ?? a[3]).split(";")) { const n = x.replace(TRIM, ""); if (n) found.push({ project: n, sdk }); }
 }
@@ -322,16 +445,22 @@ function declaredEncoding(text) {
  * read either }. A build file git knows is read as one,
  * whoever imports it. Each file is read once, and each place an Import leads to looked up once from each file.
  */
-// (a file's text by its byte-order mark, as .NET's StreamReader reads one, bytes UTF-8 does not allow as U+FFFD: only to
-// know what the file is, never to read what it names)
+// (each byte-order mark and, with none, the first "<" with the NULs beside it, by which a reader of XML finds a file's
+// encoding, UTF-32's before UTF-16's: the bytes it starts with, the encoding, and how many of them are a mark)
+const MARKS = [[[0xef, 0xbb, 0xbf], "utf-8", 3], [[0xff, 0xfe, 0, 0], "utf-32le", 4], [[0, 0, 0xfe, 0xff], "utf-32be", 4], [[0xff, 0xfe], "utf-16le", 2],
+  [[0xfe, 0xff], "utf-16be", 2], [[0x3c, 0, 0, 0], "utf-32le", 0], [[0, 0, 0, 0x3c], "utf-32be", 0], [[0x3c, 0], "utf-16le", 0], [[0, 0x3c], "utf-16be", 0]];
+// (a file's text by its byte-order mark, as .NET's StreamReader reads one, or with none by its first "<", as XML's own
+// reader finds an encoding, bytes UTF-8 does not allow as U+FFFD: only to know what the file is, never to read what it
+// names)
 function markedText(b) {
-  const utf32 = (x, little) => { const out = []; for (let i = 0; i + 3 < x.length; i += 4) { const c = little ? x.readUInt32LE(i) : x.readUInt32BE(i); out.push(c <= 0x10ffff && (c < 0xd800 || c > 0xdfff) ? String.fromCodePoint(c) : "\uFFFD"); } return out.join(""); };
-  if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return new TextDecoder("utf-8").decode(b.subarray(3));
-  if (b[0] === 0xff && b[1] === 0xfe && b[2] === 0 && b[3] === 0) return utf32(b.subarray(4), true);
-  if (b[0] === 0 && b[1] === 0 && b[2] === 0xfe && b[3] === 0xff) return utf32(b.subarray(4), false);
-  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b.subarray(2));
-  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b.subarray(2));
-  return new TextDecoder("utf-8").decode(b);
+  const [, encoding, skip] = MARKS.find(([start]) => start.every((x, k) => b[k] === x)) ?? [null, "utf-8", 0], rest = b.subarray(skip);
+  return encoding.startsWith("utf-32") ? utf32(rest, encoding === "utf-32le") : new TextDecoder(encoding).decode(rest);
+}
+// (UTF-32's code points, one that is none as U+FFFD)
+function utf32(x, little) {
+  const out = [];
+  for (let i = 0; i + 3 < x.length; i += 4) { const c = little ? x.readUInt32LE(i) : x.readUInt32BE(i); out.push(c <= 0x10ffff && (c < 0xd800 || c > 0xdfff) ? String.fromCodePoint(c) : "\uFFFD"); }
+  return out.join("");
 }
 /** Whether a file's text is an MSBuild project, its root element a Project, past blanks, byte-order marks, comments,
  *  processing instructions and a document type, in one pass. */
@@ -508,7 +637,7 @@ const shown = asText;
 export function nugetConfig(config, copy = "core/") {
   const nuget = config?.nuget;
   if (!nuget || typeof nuget !== "object" || Array.isArray(nuget)) throw new Error('the config has no "nuget". Mend: add "nuget": { "ships": [...], "tools": [...] }, each list naming lock files');
-  const odd = Object.keys(nuget).filter((k) => !["ships", "tools", "accepted", "sources"].includes(k));
+  const odd = Object.keys(nuget).filter((k) => !["ships", "tools", "accepted", "sources", "unread"].includes(k));
   if (odd.length) throw new Error(`the config's "nuget" holds keys it does not know: ${odd.join(", ")}. Mend: take them out, or correct their spelling`);
   const paths = (name) => {
     const v = nuget[name] ?? [];
@@ -525,7 +654,13 @@ export function nugetConfig(config, copy = "core/") {
   if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/". Mend: write each so, or take it out');
   const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
   if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already. Mend: name each source once, and NuGet's registry not at all`);
-  return { ships, tools, accepted, sources };
+  return { ships, tools, accepted, sources, unread: unreadOf(nuget.unread) };
+}
+// (the config's "nuget.unread", checked: a map from a file to the lines of the forms declared there)
+function unreadOf(given) {
+  const unread = given ?? {}, line = (l) => typeof l === "string" && l.trim() !== "";
+  if (!unread || typeof unread !== "object" || Array.isArray(unread) || !Object.entries(unread).every(([f, lines]) => f && Array.isArray(lines) && lines.length && lines.every(line))) throw new Error('the config\'s "nuget.unread" is not a map from a file, as git lists it, to the forms declared there, each a line as this check prints it. Mend: write it so, or take it out');
+  return unread;
 }
 
 /** Where a restore takes packages from, in order: NuGet's own registry, then the sources the config names, a folder
@@ -743,34 +878,27 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false } = {}) {
-  const copy = copyAside(root), { ships, tools, accepted, sources } = nugetConfig(config, copy);
+export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false, lock = null, configPath = null } = {}) {
+  const copy = copyAside(root), { ships, tools, accepted, sources, unread } = nugetConfig(config, copy);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (the check's own state, which the parts below read and add to)
-  const c = { config, root, copy, base, packagesDir, fetched, restored, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
+  const c = { config, root, copy, configPath, base, packagesDir, fetched, restored, lock, lists, allowedFor, ships, tools, unread, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
   const own = tracked.filter((f) => !under(f, copy));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
-  layoutFaults(c, tracked, own, locks);
-  buildFileFaults(c, own);
-  for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read. Mend: give them in the project files, and delete it`);
-  // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
-  // one git knows, and none is a link that leads elsewhere)
-  for (const s of sources.filter((x) => !x.startsWith("https://"))) {
-    if (!own.some((f) => f.startsWith(s))) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows. Mend: correct the folder's path, or take it out of "nuget.sources"`);
-    sourceFolderFaults(c, s, tracked);
-  }
+  // (what the tree alone says, read for every project by the read before the restore, which fails first where it
+  // fails: said once, so a read for one project's restore, with --lock, leaves it out, as it does the failures of
+  // another project's lock file)
+  if (lock === null) treeFaults(c, tracked, own, locks, sources);
   // Where each package was taken from, as NuGet itself records it beside the package (.nupkg.metadata, read below):
   // NuGet's own registry, a source the config names, or the SDK's own folder of packages.
   c.givenSources = sourcesOf(config, root);
   c.folders = [...c.givenSources.filter((a) => !a.startsWith("https://")).map(place), ...sdkPacks(env, root)];
   const listed = [...ships, ...tools];
-  for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config. Mend: name it in "nuget.ships" where its packages reach users, else in "nuget.tools"`);
-  for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows. Mend: correct the path, or take it out`);
 
   c.lockTexts = new Map();
   const packages = lockedPackages(c, listed, locks);
-  const toolsRead = toolsNamed(c, own, packages);
+  const toolsRead = toolsNamed(c, own, packages, lock === null ? failures : []);
   const unnamed = addRestored(c, packages);
   const entries = auditEntries(config, root);
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)
@@ -785,7 +913,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     }
   }
   for (const k of toolsRead) { c.used.add(k); c.read.add(k); }
-  unusedFaults(c, accepted);
+  // (read for one project's restore, an accepted version another project installs is no stale one here)
+  if (lock === null) unusedFaults(c, accepted);
+  else if (!listed.includes(lock)) failures.push(`${lock}, the lock file this read is for, is none the config names. Mend: name the lock file beside the project restored, as git lists it`);
   const summary = summaryOf(c, packages, listed, unnamed);
   return { failures: failures.map(shown), reports: reports.map(shown), summary };
 }
@@ -814,6 +944,22 @@ function shippedAtBase(c, lock, k) {
   return c.heldIn.get(lock).has(k);
 }
 
+// (what the tree alone says: its layout, its build files, a response file, a folder named as a source, and each lock
+// file the config names or leaves out)
+function treeFaults(c, tracked, own, locks, sources) {
+  const { failures } = c, listed = [...c.ships, ...c.tools];
+  layoutFaults(c, tracked, own, locks);
+  buildFileFaults(c, own);
+  for (const f of own.filter((f) => RESPONSE_FILE.test(posix.basename(f)))) failures.push(`${f}: a response file gives every build of its folder options this check cannot read. Mend: give them in the project files, and delete it`);
+  // (a folder named as a source is the project's own, in the pull request for the reviews to read: every file in it is
+  // one git knows, and none is a link that leads elsewhere)
+  for (const s of sources.filter((x) => !x.startsWith("https://"))) {
+    if (!own.some((f) => f.startsWith(s))) failures.push(`the config's "nuget.sources" names ${s}, a folder that holds no file git knows. Mend: correct the folder's path, or take it out of "nuget.sources"`);
+    sourceFolderFaults(c, s, tracked);
+  }
+  for (const f of locks) if (!listed.includes(f)) failures.push(`${f} is named in neither "nuget.ships" nor "nuget.tools" of the config. Mend: name it in "nuget.ships" where its packages reach users, else in "nuget.tools"`);
+  for (const f of listed) if (!locks.has(f)) failures.push(`the config's "nuget" names ${f}, which is no lock file git knows. Mend: correct the path, or take it out`);
+}
 // (a project file with no lock file beside it, and a lock file this check does not read)
 function layoutFaults({ root, copy, failures }, tracked, own, locks) {
   for (const f of projectFiles(tracked, copy)) {
@@ -843,9 +989,56 @@ function buildFileFaults(c, own) {
     const named = c.now.brought.has(f) ? `${f}, which a build file brings in,` : f;
     for (const what of found) (held ? c.reports : c.failures).push(`${named} ${what}${held ? ` ${heldBefore}` : ""}`);
   }
-  for (const f of c.now.typed) c.reports.push(`${f} has a document type, so this check does not read its Imports (reported, and passes)`);
-  for (const { from, project, via, why } of c.now.unread) c.reports.push(`${from} ${via ? `brings in ${project} by ${via}` : `imports ${project}`}, ${why}: a lock file kept elsewhere or a fallback folder it names goes unseen (reported, and passes)`);
+  for (const f of c.now.typed) {
+    const what = `${f} has a document type, so this check does not read its Imports`;
+    if (!c.base) c.reports.push(`${what} (reported, and passes)`);
+    else if (sameAsBase(c, f)) c.reports.push(`${what} ${heldBefore}`);
+    else c.failures.push(`${what}, nor what they bring in. Mend: take the document type out`);
+  }
+  formFaults(c, own);
 }
+// Each form the read before the restore does not read (formsIn, globalForms, and an Import it cannot follow): one the
+// config's "nuget.unread" declares word for word, or the base held in the same file, is reported; any other fails,
+// and so does a line declared that no form matches. With no base, each is reported; after the restore, which the read
+// before it held them in, none is read; nor where the project has no .NET project file, which no restore then reads.
+function formFaults(c, own) {
+  if (c.restored || !own.some((f) => PROJECT.test(f))) return;
+  const now = formsOf(c.now, own, (f) => readNow(c, f));
+  for (const f of new Set([...now.keys(), ...Object.keys(c.unread)])) {
+    const forms = now.get(f) ?? [], { left, stale } = takeEach(forms.map((x) => x.line), Object.hasOwn(c.unread, f) ? c.unread[f].map(collapsed) : []);
+    for (const line of stale) c.failures.push(`the config's "nuget.unread" declares, for ${f}, ${line}, which is no form this check finds there. Mend: write it as this check prints the form, or take it out where the form is gone`);
+    const unheld = c.base && left.length ? takeEach(left, (formsThen(c).get(f) ?? []).map((x) => x.line)).left : [];
+    const rest = [...left];
+    for (const { line, what } of forms) {
+      const at = rest.indexOf(line);
+      if (at < 0) { c.reports.push(`${f} ${what} (declared in the config's "nuget.unread": reported, and passes)`); continue; }
+      rest.splice(at, 1);
+      const fails = unheld.indexOf(line);
+      if (fails < 0) { c.reports.push(`${f} ${what} ${c.base ? heldBefore : "(reported, and passes)"}`); continue; }
+      unheld.splice(fails, 1);
+      c.failures.push(formFailure(c, f, what, line));
+    }
+  }
+}
+// (a form's failure, worded for a session with no rule file open: the file, the exact line to declare and where)
+function formFailure(c, f, what, line) {
+  const where = c.configPath ? `${c.configPath}, the licence check's config` : "the licence check's config";
+  return `${f} ${what}. Mend: take it out; or, where it stays, add to ${where}, in "nuget.unread" (its "nuget": { "unread": { "<file>": [<lines>] } }), under "${f}", this exact line: ${JSON.stringify(line)}. The line stands for the form as it is written, so any change to it needs a line of its own, which the reviews read`;
+}
+// (the forms of each file, as its lines and what is said of each: of a build file read, and of a global.json)
+function formsOf(reading, own, read) {
+  const out = new Map(), add = (f, line, what) => { if (!out.has(f)) out.set(f, []); out.get(f).push({ line, what }); };
+  for (const [f, text] of reading.files) {
+    if (reading.unreadable.has(f) || reading.typed.includes(f)) continue;
+    for (const line of formsIn(text).map(formLine)) add(f, line, `holds what the read before the restore does not follow (a target, a task, a download or an SDK from a package, or a setting that turns how the restore runs): ${line}`);
+  }
+  for (const { from, project, via, why } of reading.unread) { const line = via ? `brings in ${project} by ${via}` : `imports ${project}`; add(from, line, `${line}, ${why}: what it brings in goes unread`); }
+  for (const f of own.filter((g) => posix.basename(g).toLowerCase() === "global.json")) {
+    for (const line of globalForms(read(f))) add(f, line, `holds what the read before the restore does not read (an SDK from a package, a folder of SDKs): ${line}`);
+  }
+  return out;
+}
+const formsThen = (c) => (c.formsThen ??= formsOf(readingThen(c), [...baseTree(c).keys()], (g) => baseBytes(c, g)));
 function readNow(c, f) {
   if (!c.bytesNow.has(f)) c.bytesNow.set(f, readProject(c.root, f));
   return c.bytesNow.get(f);
@@ -894,10 +1087,11 @@ function baseFile(c, file, follow = true) {
   return null;
 }
 function baseBytes(c, file) { const f = baseFile(c, file); return f === null ? null : bytesAt(c, f); }
+// (the base's build files as importsOf reads them, its own projects read by what they are: each of today's that the
+// base held as a project too)
+const readingThen = (c) => (c.then ??= importsOf([...baseTree(c).keys()], (g) => baseBytes(c, g), [...c.byContent].filter((g) => { const b = baseTree(c).has(g) ? baseBytes(c, g) : null; return b !== null && projectRooted(markedText(b)); })));
 function broughtThen(c, f) {
-  // (the base's own projects read by what they are: each of today's that the base held as a project too)
-  if (!c.then) c.then = importsOf([...baseTree(c).keys()], (g) => baseBytes(c, g), [...c.byContent].filter((g) => { const b = baseTree(c).has(g) ? baseBytes(c, g) : null; return b !== null && projectRooted(markedText(b)); })).brought;
-  return [...c.now.brought.get(f)].every((by) => c.then.get(f)?.has(by));
+  return [...c.now.brought.get(f)].every((by) => readingThen(c).brought.get(f)?.has(by));
 }
 // (whether a file stands as the base held it, byte for byte, as MSBuild reads it: as the base's blob, save the line
 // endings a checkout writes for itself (core.autocrlf on Windows), which XML reads as one; or as git checks that blob
@@ -942,19 +1136,22 @@ const takenFromGiven = (c, source) => (/^https?:/iu.test(source) ? c.givenSource
 function lockedPackages(c, listed, locks) {
   const packages = new Map(); // by id@version, lower case: { id, version, shipped, lock }
   for (const f of listed.filter((l) => locks.has(l))) {
-    const text = lockText(c, f);
+    // (with --lock, another project's lock file is read for what it names alone: its faults were said before the restore)
+    const failures = c.lock === null || c.lock === f ? c.failures : [];
+    const text = lockText(c, f, failures);
     if (text === null) continue;
     const read = lockPackages(text, f);
-    c.failures.push(...read.failures);
-    if (lockAsBase(c, f, text)) c.reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else c.failures.push(...read.split);
+    failures.push(...read.failures);
+    if (lockAsBase(c, f, text)) c.reports.push(...read.split.map((x) => `${x} ${heldBefore}`)); else failures.push(...read.split);
     for (const p of read.packages) {
       const k = key(p.id, p.version), shipped = c.ships.includes(f), was = packages.get(k);
       // (the entry kept is the one kept before this was said, so the file read is the one read then)
       if (was && was.contentHash !== p.contentHash) {
         const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
-        if (lockAsBase(c, f, text) && lockAsBase(c, was.lock, lockText(c, was.lock))) c.reports.push(`${x} ${heldBefore}`); else c.failures.push(x);
+        if (lockAsBase(c, f, text) && lockAsBase(c, was.lock, lockText(c, was.lock))) c.reports.push(`${x} ${heldBefore}`); else failures.push(x);
       }
-      if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
+      if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f, locks: new Set([...(was?.locks ?? []), f]) });
+      else was.locks.add(f);
     }
   }
   return packages;
@@ -963,10 +1160,10 @@ function lockedPackages(c, listed, locks) {
 // it already named are reported; one a pull request lists for the first time is not held)
 const lockAsBase = (c, f, text) => !c.base || (c.listedThen.includes(f) && textAt(c.root, c.base, f) === text);
 // (a lock file or a tools manifest is read only where it is a file of bytes: a device would never end)
-function lockText(c, f) {
+function lockText(c, f, failures = c.failures) {
   if (!c.lockTexts.has(f)) {
     const bytes = readProject(c.root, f);
-    if (bytes === NOT_A_FILE) c.failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own, within that bound`);
+    if (bytes === NOT_A_FILE) failures.push(`${f} is ${NOT_A_FILE_IS}, and this check reads none. Mend: make it a file of the project's own, within that bound`);
     c.lockTexts.set(f, bytes === NOT_A_FILE ? null : bytes?.toString("utf8") ?? "");
   }
   return c.lockTexts.get(f);
@@ -974,12 +1171,13 @@ function lockText(c, f) {
 
 // the tools a manifest of dotnet's names, read before the restore alone (no restore brings them), each held to the
 // tools' list, one exact version each (nuget-fetch.mjs fetched them); after the restore, a yes or an audit entry for
-// one of them stands, since the check before it read that tool
-function toolsNamed(c, own, packages) {
+// one of them stands, since the check before it read that tool; with --lock, what is wrong with a manifest itself is
+// not said again (`failures` empty), the read before the restore having said it
+function toolsNamed(c, own, packages, failures) {
   const toolsRead = new Set();
   for (const f of own.filter((t) => posix.basename(t).toLowerCase() === "dotnet-tools.json")) {
     let manifest = {};
-    const text = lockText(c, f);
+    const text = lockText(c, f, failures);
     if (text === null) continue;
     try { manifest = parseBounded(unmarked(text)); } catch { if (c.fetched) (!c.base || textAt(c.root, c.base, f) === text ? c.reports : c.failures).push(`${f} is not JSON`); }
     if (!c.fetched) {
@@ -1022,13 +1220,16 @@ function auditEntries(config, root) {
 }
 
 // (one package, `k` its id@version: its source and its licence, held to its list, an audit entry or the owner's yes)
+// (whether a package not in the folder read is another read's: before the restore, one the fetch could not reach,
+// read after it, as the fetch said; read for one project's restore, one only another's lock file names, read where
+// that one is restored)
+const readElsewhere = (c, p, manifest) => (c.fetched || (c.lock !== null && !p.locks?.has(c.lock))) && (!c.packagesDir || !existsSync(manifest));
 function judge(c, k, p) {
   const { config, packagesDir, failures } = c;
   const name = `${p.id}@${p.version}`, list = p.shipped ? "the list for what ships" : "the tools' list";
   const where = p.lock ?? "brought by the restore, and named in no lock file read here";
   const manifest = join(packagesDir ?? "", p.id.toLowerCase(), p.version.toLowerCase(), `${p.id.toLowerCase()}.nuspec`);
-  // (before the restore, one the fetch could not reach is read after it: the fetch said so)
-  if (c.fetched && (!packagesDir || !existsSync(manifest))) { c.used.add(k); c.read.add(k); return; }
+  if (readElsewhere(c, p, manifest)) { c.used.add(k); c.read.add(k); return; }
   if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read. Mend: restore from the lock files first (dotnet restore --locked-mode), then run the check`); return; }
   takenFaults(c, name, where, manifest);
   const text = regularText(manifest, { bound: BOUND });
@@ -1122,7 +1323,8 @@ if (guard(import.meta.url)) {
     process.exit(0);
   }
   const at = args.indexOf("--packages"), packagesDir = at >= 0 ? args[at + 1] : undefined;
-  const configPath = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1));
+  const lockAt = args.indexOf("--lock"), lock = lockAt >= 0 ? args[lockAt + 1] ?? "" : null;
+  const configPath = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1) && (lockAt < 0 || i !== lockAt + 1));
   if (args.includes("--sources")) {
     if (!configPath) fail("no config was named. Mend: name it: node core/scripts/nuget.mjs <config> --sources");
     let from;
@@ -1134,12 +1336,13 @@ if (guard(import.meta.url)) {
   // (the config is read only where it is a file of bytes: a device would never end)
   try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   if (args.includes("--restored") && args.includes("--fetched")) fail("--restored and --fetched were both given: --restored is for the run after a restore, which the read with --fetched comes before. Mend: run the read with --fetched before the restore and the one with --restored after it, each on its own");
+  if (lock !== null && !args.includes("--restored")) fail("--lock was given without --restored: it names the lock file of the one project a restore just restored. Mend: give it beside --restored alone, after that project's restore");
   let result;
   try {
     const { root, tracked } = project(), config = loadConfig(configPath, root);
     // (after a restore, no base: what git would read it by, the restore could have written)
     const restored = args.includes("--restored"), base = restored ? null : baseOf(root);
-    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored });
+    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored, lock, configPath });
   } catch (e) { fail(e.message); }
   for (const r of result.reports) console.log(`REPORT: ${r}`);
   for (const f of result.failures) console.error(`${advisory ? "WOULD FAIL" : "FAIL"}: ${f}`);

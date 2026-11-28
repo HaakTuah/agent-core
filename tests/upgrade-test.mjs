@@ -11,8 +11,9 @@
 // it (scripts/workflow-run.mjs), every workflow of the core its own workflows call: the sync's pull request,
 // the push of its merge to main, a pull request of its own that touches only its docs, one that touches its package
 // files, and the daily core-moved run; then its hooks, from main's copy as Claude Code runs them. Before the sync and
-// after it, the core's checks from plain git (scripts/check.mjs --own) run on a push to main and on a pull request of
-// its own, its own workflows among them, one of which runs a check of its copy with no install step (the case of
+// after it, the core's checks from plain git (scripts/check.mjs --own --own-repository, each project the owner's own)
+// run on a push to main and on a pull request of its own, its own workflows among them, one of which runs a check of
+// its copy with no install step (the case of
 // #1079), and no job that passed before fails after (release-trial.mjs, compared); in a new repository of each kind, as the
 // kit at the commit under test writes it, every job passes (#1084). CodeQL is not run here, the
 // dependency review stands in by its lists over what a pull request brings into an npm lock file (#1310), and GitHub's API is a stand-in that gives the security-review check
@@ -63,6 +64,7 @@ import { parseYaml } from "../scripts/parse-yaml.mjs";
 import { licenceOk } from "../scripts/licences.mjs";
 import { compared } from "../scripts/release-trial.mjs";
 import { evaluate, pathsLetThrough, runWorkflow } from "../scripts/workflow-run.mjs";
+import { eventFile } from "../scripts/check.mjs";
 
 const STEP_LEADS = STEPS.map(s => s.lead);
 const reported = out => out.split("\n").filter(l => l.startsWith("- ")).map(l => STEP_LEADS.find(lead => l.startsWith(`- ${lead}:`) || l.startsWith(`- ${lead} (`))).filter(Boolean);
@@ -304,7 +306,7 @@ function verdictsOf(p, baseSha = null) {
   const file = path.join(tmp, `${p.name}-verdicts-${++runs}.json`);
   // (from this clone, which holds the commit under test and its installed packages, as a pipeline runs it from a clone of
   // the core; the core's address leads to the scratch core)
-  const r = spawnSync(process.execPath, [path.join(root, "scripts", "check.mjs"), "--own", "--verdicts", file, ...(baseSha ? ["--base", baseSha] : [])],
+  const r = spawnSync(process.execPath, [path.join(root, "scripts", "check.mjs"), "--own", "--own-repository", "--verdicts", file, ...(baseSha ? ["--base", baseSha] : [])],
     { cwd: p.dir, env: { ...base, ...sdkEnv, PERSONAL_TERMS: terms }, encoding: "utf8", maxBuffer: 1 << 28 });
   let verdicts = {};
   try { verdicts = JSON.parse(fs.readFileSync(file, "utf8")); } catch { /* (none written: the run stopped before its end) */ }
@@ -391,6 +393,9 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     base_ref: event === "pull_request" ? "main" : "", head_ref: event === "pull_request" ? "change" : "", ref: event === "pull_request" ? "refs/pull/1/merge" : "refs/heads/main",
     event: event === "pull_request" ? { action, pull_request: pull, repository } : event === "push" ? { ref: "refs/heads/main", before: baseSha, after: sha, repository } : { repository } };
   fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [summary(sha)], "pulls/1/comments": [], "pulls/1/commits": [{ sha, commit: { author: { name: p.owner } }, author: { login: p.owner } }], "pulls/1/files": [], "/issues\\?": [] }));
+  // (the event file GitHub's runner hands each step, holding what proves the code the project's own: each run here is a
+  // push or a pull request of a branch of the project's own repository; check.mjs, eventFile)
+  const own = eventFile(true, github.event, fs.mkdtempSync(path.join(tmp, "event-")));
   const workspace = () => {
     const ws = path.join(tmp, "ws", String(++runs));
     execFileSync("git", ["clone", "-q", "--no-checkout", "--", ".", ws], { cwd: p.dir, stdio: ["ignore", "pipe", "pipe"] });
@@ -433,7 +438,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
     // (a workflow of the project's own that calls none of the core's, run as GitHub would where asked: its steps run the
     // project's copy of the core's scripts)
     if (ownToo && Object.values(wf.jobs ?? {}).every(job => !String(job?.uses ?? "").toLowerCase().startsWith(`${CORE.toLowerCase()}/`))) {
-      for (const r of runWorkflow(git(p.dir, "show", `${sha}:.github/workflows/${file}`), { github, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${r.job}`, { ...r, own: true }]);
+      for (const r of runWorkflow(git(p.dir, "show", `${sha}:.github/workflows/${file}`), { github, base: { ...base, ...sdkEnv, ...own }, workspace, uses, dry, temp: tmp })) out.push([`${file}/${r.job}`, { ...r, own: true }]);
       continue;
     }
     // (each call's outputs, as its workflow's `workflow_call` names them from its jobs' own, empty where a job was
@@ -452,7 +457,7 @@ function checks(p, event, sha, { baseSha = "", title = "A change", body = BODY, 
       const inputs = Object.fromEntries(Object.entries(job.with ?? {}).map(([k, v]) => [k, typeof v === "string" && v.includes("${{") ? evaluate(v.replace(/^\$\{\{|\}\}$/g, ""), callerCtx) : v]));
       const secrets = job.secrets === "inherit" ? { PERSONAL_TERMS: terms } : Object.fromEntries(Object.entries(job.secrets ?? {}).map(([k, v]) => [k, evaluate(String(v).replace(/^\$\{\{|\}\}$/g, ""), callerCtx)]));
       const caller = { ...github, workflow_ref: `${p.repo}/.github/workflows/${file}@${github.ref}` };
-      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv }, workspace, uses, dry, temp: tmp, once: fetchedOnce, installed: installedOnce });
+      const called = parseYaml(text), ran = runWorkflow(text, { inputs, secrets, github: caller, base: { ...base, ...sdkEnv, ...own }, workspace, uses, dry, temp: tmp, once: fetchedOnce, installed: installedOnce });
       for (const r of ran) out.push([`${file}/${id}/${r.job}`, r]);
       const jobs = Object.fromEntries(ran.map(r => [r.job, { outputs: Object.fromEntries(Object.entries(called.jobs?.[r.job]?.outputs ?? {})
         .map(([k, v]) => [k, evaluate(String(v).trim().replace(/^\$\{\{|\}\}$/g, ""), { steps: r.outputs ?? {} }) ?? ""])) }]));
