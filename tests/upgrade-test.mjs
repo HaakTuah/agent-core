@@ -266,7 +266,7 @@ function project(name, from, { owner, kit, isPrivate, windows, files, as }) {
 // its address on GitHub taken nowhere by the stand-in's rewrite, which is left out.
 let host = null;
 function provePure(p) {
-  host ??= ghStandIn(env, tmp, path.join(tmp, "no-origin.git"));
+  host ??= ghStandIn(env, fs.mkdtempSync(path.join(tmp, "gh-")), path.join(tmp, "no-origin.git"));
   const PATHKEY = Object.keys(host.env).find(k => k.toUpperCase() === "PATH"), ours = { full_name: p.repo, id: 4000 + 2 };
   fs.writeFileSync(host.ghData, JSON.stringify({ "pulls\\?state=open": [{ number: 1, head: { sha: git(p.dir, "rev-parse", "HEAD"), repo: ours }, base: { repo: ours } }] }));
   const onGitHub = `https://github.com/${p.repo}.git`, origin = git(p.dir, "config", "--get", "remote.origin.url"), event = path.join(tmp, `${p.name}-event.json`);
