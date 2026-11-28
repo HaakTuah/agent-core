@@ -86,7 +86,8 @@ function baseCommit() {
   if (!from) return null;
   try { return git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${from}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${from} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); }
 }
-const show = AT ? f => (tracked.includes(f) ? atCommit(f) : null) : undefined, under = AT ? dir => tracked.filter(f => f.startsWith(`${dir}/`)) : undefined;
+// (at a commit, the reader carries where a path leads, as the work tree's does, so that both list a tool's file that is a link alike)
+const show = AT ? Object.assign(f => (tracked.includes(f) ? atCommit(f) : null), { where: atCommit.where }) : undefined, under = AT ? dir => tracked.filter(f => dir === "." || f.startsWith(`${dir}/`)) : undefined;
 let RULES, TOOLS;
 try {
   // (an agent tool's files that no other way names a rule file, tracked, as git lists them)

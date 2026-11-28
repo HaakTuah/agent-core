@@ -11,6 +11,9 @@
 // and a check passes a `read` and a `list` that read a commit's tree, to hold the base's list. A reader may carry
 // `where`, the path a path leads to, its links followed (followLinks), so that a tool's folder that is a link is
 // listed where it leads: readHere and readAt's readers carry it.
+// Not hardened here, each needing text already on the default branch to act as a tool's instructions: a link on the way
+// to a tool's folder or file, or between the links of a chain, is not itself listed, so a pull request that only points
+// it elsewhere in the project changes no listed file.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -123,12 +126,18 @@ export function placeAt(commit) {
 // Where `read` carries `where`, each folder is listed where its links lead (none where one leads out), and a file
 // there that is a link, and an entry file that is one, is listed with the file it leads to, so that a change to either
 // is a change to a tool's file;
-// what lies in a submodule is listed as none, since no check here can read it.
+// a folder that leads to the project's root holds every file the tree holds, its lister asked for "."; a folder in a
+// submodule is listed as none, since no check here can read it, while an entry file there is listed where `read` reads it.
+// `list` is given a path to read literally, never as a pattern.
 export const toolFiles = (read = readHere, list = tracked) => {
   const where = read.where ?? (f => f);
-  const listed = FOLDERS.flatMap(d => { const at = where(d); return at ? list(at).filter(f => f.startsWith(`${at}/`)) : []; });
+  const listed = toolFolders(read).flatMap(at => list(at === "" ? "." : at).filter(f => at === "" || f === at || f.startsWith(`${at}/`)));
   return [...new Set(TOOL_FILES.concat(listed).flatMap(f => [f, where(f)]))].filter(f => f && read(f) !== null);
 };
+// The folders of FOLDERS where `read` says they lead ("" the project's root), each where none leads out; and whether a
+// path lies in one of them, so that a file a pull request adds there is a tool's file before any list holds it.
+export const toolFolders = (read = readHere) => [...new Set(FOLDERS.map(read.where ?? (f => f)).filter(at => at !== null))];
+export const inToolFolder = (name, folders) => folders.some(at => at === "" || name === at || String(name).startsWith(`${at}/`));
 // A rule file or protected folder by its name alone (floor rule 3): what a tool takes its instructions from, wherever
 // it lies, the threat model, the manifest, the copy of the core, and the folders of what runs by itself.
 export const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;

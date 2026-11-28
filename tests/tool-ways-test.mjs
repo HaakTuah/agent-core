@@ -1,13 +1,14 @@
 // What stands on the way to an agent tool's files: a tool's folder of instructions that is a link, or a file there that
 // is one, is listed where it leads, in the work tree and at a commit alike, and nothing outside the project is listed
-// (rule-files.mjs, toolFiles); an entry file inside a submodule stands but is not read (entry-files.mjs). Each case in
-// a scratch repository.
+// (rule-files.mjs, toolFiles), a folder that leads to the root holding every file there; an entry file inside a
+// submodule, or reached through a link into one, stands but is not read (entry-files.mjs). Each case in a scratch
+// repository.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { readAt, ruleFiles, toolFiles } from "../scripts/rule-files.mjs";
+import { inToolFolder, readAt, ruleFiles, toolFiles, toolFolders } from "../scripts/rule-files.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
 let count = 0, failed = 0;
@@ -53,6 +54,43 @@ const repo = prefix => {
     const plain = toolFiles(f => (tree.includes(f) ? "" : null), d => tree.filter(f => f.startsWith(`${d}/`)));
     ok(plain.join() === "CLAUDE.md,.agent/rules/c.md", "a reader that says nothing of where a path leads lists each folder as it is named, as before");
   } finally { process.chdir(was); fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(away, { recursive: true, force: true }); }
+}
+
+// ---- a tool's folder that leads to the project's root, and a file added where a folder leads ----
+{
+  const { dir, git, write, link } = repo("tool-ways-root-");
+  const was = process.cwd();
+  try {
+    write("SECURITY.md", "**the rule files:** `docs/t.md`;\n"); write("README.md", "r\n"); write("QUEUE.md", "q\n");
+    link("..", ".kiro/steering"); write("docs/steer/b.md", "b\n"); link("../docs/steer", ".agents/rules");
+    git("add", "-A"); git("commit", "-qm", "root");
+    const tree = git("ls-tree", "-r", "--name-only", "-z", "HEAD").split("\0").filter(Boolean);
+    process.chdir(dir);
+    const here = toolFiles(), folders = toolFolders();
+    const at = toolFiles(readAt("HEAD"), d => tree.filter(f => d === "." || f.startsWith(`${d}/`)));
+    process.chdir(was);
+    ok(["README.md", "QUEUE.md"].every(f => here.includes(f) && at.includes(f)), `a tool's folder that is a link to the project's root lists the files there, in the work tree and at a commit (${here.join(", ")})`);
+    ok(folders.includes("") && folders.includes("docs/steer") && inToolFolder("docs/steer/new.md", ["docs/steer"]) && inToolFolder("x/new.md", [""]) && !inToolFolder("docs/steerage.md", ["docs/steer"]),
+      "and a file a pull request adds where a tool's folder leads lies in a tool's folder before any list holds it, as the code-review wait reads it");
+  } finally { process.chdir(was); fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
+// ---- an entry file reached through a link into a submodule ----
+{
+  const { dir, git, write, link } = repo("tool-ways-sublink-");
+  const run = env => {
+    try { return { status: 0, out: execFileSync(process.execPath, [SCRIPT], { cwd: dir, encoding: "utf8", env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] }) }; }
+    catch (e) { return { status: e.status, out: `${e.stdout}${e.stderr}` }; }
+  };
+  try {
+    write("AGENTS.md", "@a.md\n"); write("a.md", "a\n"); git("add", "-A"); git("commit", "-qm", "base");
+    git("update-index", "--add", "--cacheinfo", `160000,${git("rev-parse", "HEAD").trim()},vendor/kiro`);
+    write("vendor/kiro/steering/core.md", "---\ninclusion: always\n---\n@AGENTS.md\n"); link("vendor/kiro", ".kiro");
+    const refused = (r, what) => ok(r.status === 1 && mended(r.out) && r.out.includes(".kiro/steering/core.md stands here but is not read"), what);
+    refused(run({ ENTRY_BASE: "HEAD" }), "an entry file reached through a link into a submodule, checked out, fails, saying its mend, its text unread");
+    fs.rmSync(path.join(dir, "vendor/kiro/steering"), { recursive: true });
+    refused(run({ ENTRY_BASE: "HEAD" }), "and so does one through a link into a submodule not checked out");
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 // ---- an entry file inside a submodule ----

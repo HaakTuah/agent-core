@@ -51,7 +51,7 @@ const BOUND = 1 << 20;
 // leading nowhere or out of the project, and a submodule at the path or on its way, behind which no check can see what
 // stands.
 const standsHere = file => {
-  if (inSubmodule(file)) return true;
+  if (throughSubmodule(file)) return true;
   try { fs.lstatSync(file); return true; } catch { /* (then each folder on its way) */ }
   const parts = clean(file).split("/");
   return parts.slice(0, -1).some((_, i) => { const up = parts.slice(0, i + 1).join("/"); try { return fs.lstatSync(up).isSymbolicLink() && leadsOut(".", up); } catch { return false; } });
@@ -68,6 +68,13 @@ const inSubmodule = file => {
   }
   const parts = clean(file).split("/");
   return parts.some((_, i) => gitlinks.has(parts.slice(0, i + 1).join("/")));
+};
+// (whether the path as written, a path its links' walk passes, or where it ends lies in a submodule: a link into one
+// leads a tool to another repository's files as surely as the path itself)
+const throughSubmodule = file => {
+  let passed = inSubmodule(file);
+  const at = followLinks(clean(file), p => { passed ||= inSubmodule(p); return isLinkHere(p); }, linkTextHere, isFolderHere);
+  return passed || (at !== null && inSubmodule(at));
 };
 // Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit (followLinks): written
 // relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link
@@ -115,11 +122,11 @@ if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
   // (the work tree's files as ownText reads them, a link inside the project followed, and the base's as readAt reads
   // its tree, each link inside it followed the same way, so that a file the base held as a link reads as its target)
-  // (a file that stands here but that ownText refuses, that lies in a submodule, or that a link on its way written from
+  // (a file that stands here but that ownText refuses, that lies in a submodule or is reached through a link into one, or that a link on its way written from
   // a root or climbing above the project's root reaches, is one no check can read: it fails where the base read it or held nothing there, as
   // the pull request's own doing, and is noted where the base held it unread too)
   const unread = new Set(), place = base ? placeAt(base) : null, was = place ? readAt(base, place, { bound: BOUND }) : null;
-  const here = file => { const text = !inSubmodule(file) && asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
+  const here = file => { const text = !throughSubmodule(file) && asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
   const read = verdict(here, was);
   for (const f of unread) {
     const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, outside any submodule, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no submodule and no such link on its way`;
