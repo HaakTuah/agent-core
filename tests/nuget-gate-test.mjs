@@ -50,7 +50,8 @@ const START = {
 let n = 0;
 // The step's answer on a pull request that changes `files` (null removes one) from a project that starts as `start`.
 // With `steps`, the look runs in the environment check.mjs gives the steps it runs (stepEnv), not the scratch's own.
-function gate(files, { start = {}, base = true, caller = "nuget.yml", link = null, steps = false } = {}) {
+// With `own` false, the look is not told the code is the repository's own (OWN), and so runs no restore of its own.
+function gate(files, { start = {}, base = true, caller = "nuget.yml", link = null, steps = false, own = true, path: on = null } = {}) {
   const dir = path.join(tmp, `repo-${++n}`);
   fs.mkdirSync(dir);
   git(dir, "init", "-q", "-b", "main");
@@ -66,10 +67,10 @@ function gate(files, { start = {}, base = true, caller = "nuget.yml", link = nul
   git(dir, "commit", "-q", "--allow-empty", "-m", "a change");
   const output = path.join(tmp, `look-${n}`);
   fs.writeFileSync(output, "");
-  const from = steps ? { ...stepEnv(path.join(tmp, `step-home-${n}`)), MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" } : env;
+  const from = steps ? { ...stepEnv(path.join(tmp, `step-home-${n}`)), MSBUILDDISABLENODEREUSE: "1", DOTNET_CLI_USE_MSBUILD_SERVER: "0" } : { ...env, ...(on ? { PATH: on } : {}) };
   const r = spawnSync("bash", ["-e", "core/scripts/nuget-look.sh"], { cwd: dir, encoding: "utf8", env: { ...from, BASE: base ? baseSha : "", CONFIG: "checks/licences.json",
     CALLER: `someone/project/.github/workflows/${caller}@refs/pull/1/merge`, GITHUB_REPOSITORY: "someone/project", CORE_AT: "core/", NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`),
-    GITHUB_OUTPUT: output, DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" } });
+    GITHUB_OUTPUT: output, OWN: own ? "true" : "", DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" } });
   const said = /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim();
   return { run: r.status === 0 ? said : undefined, out: `${r.stdout}${r.stderr}` };
 }
@@ -106,6 +107,20 @@ if (canLink) {
   ok(folder.run === undefined && folder.out.includes("checks/licences.json, the licence check's config, stands in a folder outside the project") && mended(folder.out), "a config whose folder a tracked link leads out of the project is refused, with its mend", folder.out);
   const dirAt = gate(dir => { const at = path.join(dir, "checks/licences.json"); fs.rmSync(at); fs.mkdirSync(at); fs.writeFileSync(path.join(at, "x"), "x"); });
   ok(dirAt.run === undefined && dirAt.out.includes("is no regular file (a folder, a device or a pipe)") && mended(dirAt.out), "a folder in the config's place is refused, with its mend", dirAt.out);
+}
+
+// without proof that the code is the repository's own (OWN), the look runs no restore of its own, NuGet's word not
+// asked: where git's diff names nothing changed it says nothing to restore, and where it names a change it restores,
+// which checks.mjs then refuses (a stand-in for dotnet that leaves a mark, on Linux and macOS)
+if (process.platform !== "win32") {
+  const bin = path.join(tmp, "marking-dotnet"), mark = path.join(tmp, "dotnet-ran");
+  fs.mkdirSync(bin, { recursive: true });
+  fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh\necho ran > '${mark}'\nexit 1\n`, { mode: 0o755 });
+  const on = `${bin}${path.delimiter}${env.PATH}`;
+  const quiet = gate({ "build/flag.txt": "yes\n" }, { start: { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" }, own: false, path: on });
+  ok(quiet.run === "false" && !fs.existsSync(mark) && quiet.out.includes("the code is not proven the repository's own, so no restore ran here"), "without proof, a change git's diff does not name runs no restore of the look's own, and says nothing to restore", quiet.out);
+  const named = gate({ "src/App/App.csproj": project("<PackageReference Include=\"Serilog\" Version=\"4.0.0\" />") }, { own: false, path: on });
+  ok(named.run === "true" && !fs.existsSync(mark) && named.out.includes("Changed:"), "and one it names says to restore, with no restore of its own", named.out);
 }
 
 // the second look, NuGet's own word, where no file the first names changed
@@ -155,13 +170,13 @@ else {
 // the whole job, its restore and its check run as GitHub runs them, on a project that holds the core as core/
 if (sdk) {
   const FETCH = "Every locked package and tool, fetched before the restore and held to its list";
-  // (where the first look itself restored, the pull request's build files have run: the read before the restore is
-  // left out, nothing it reads having changed from the base)
+  // (where the first look itself restored, which it does only where nothing it reads changed from the base, the read
+  // before the restore runs all the same, before the check's own restore)
   const bare = project("").replace(/  <ItemGroup>[\s\S]*?<\/ItemGroup>\n/, "");
   // (a text file a build file reads, which only NuGet's own word sees: any project file, whatever brings it in, the first
   // look names by itself)
   const built = whole({ "build/flag.txt": "yes\n" }, { "Directory.Build.props": FLAGGED, "build/flag.txt": "no\n" });
-  ok(!built.passed && /NU1004/.test(built.out) && !built.ran.includes(FETCH) && built.out.includes("the licence read before the restore is left out"), "where the first look restored, the read before the restore is left out, and the restore fails what no lock file holds", built.out.slice(-1500));
+  ok(!built.passed && /NU1004/.test(built.out) && built.ran.includes(FETCH) && built.ran.indexOf(FETCH) < built.ran.indexOf("Restore each project file from its lock file alone") && !built.out.includes("is left out"), "where the first look restored, the read before the restore still runs before the check's restore, and the restore fails what no lock file holds", built.out.slice(-1500));
   const imported = whole({ "build/deps.xml": ADDS }, { "src/App/App.csproj": bare.replace("<PropertyGroup>", '<Import Project="..\\..\\build\\deps.xml" />\n  <PropertyGroup>'), "build/deps.xml": EMPTY });
   ok(!imported.passed && /NU1004/.test(imported.out) && imported.ran.includes(FETCH) && imported.ran.indexOf(FETCH) < imported.ran.indexOf("Restore each project file from its lock file alone") && imported.out.includes("build/deps.xml"), "where only an imported file changed, the first look names it, so the read before the restore runs, and the restore fails what no lock file holds", imported.out.slice(-1500));
   const stale = whole({ "src/App/App.csproj": project("") });
@@ -218,7 +233,7 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
     git(dir, "commit", "-q", "-m", "a change");
     const output = path.join(tmp, `look-${n}`);
     fs.writeFileSync(output, "");
-    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json",
+    const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json", OWN: "true",
       CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
     return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}` };
   };

@@ -25,7 +25,7 @@
 # project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine
 # installed from the core's .packages/requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
 # package checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files,
-# after all.
+# after all, on a checkout from which it first takes every file git does not know.
 # One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
 # before.
 name: core
@@ -424,5 +424,32 @@ jobs:
           CONFIG: ${{ inputs.nuget }}
           ADVISORY: ${{ inputs.advisory }}
         run: |
+          # (what HEAD holds put back first, contents and modes, and every file git does not know taken out, ignored ones and
+          # nested repositories among them: what the steps before wrote or changed in the checkout, the packages they
+          # installed from the pull request's lock files and the core's own among them, so the restore finds what HEAD
+          # holds alone. The same in the submodule that carries the core, where one does, which this job checked out, and
+          # in each folder of it; any other folder git records as a submodule, which git's clean leaves as it stands, must
+          # hold nothing, and no git runs inside it. Where anything git does not know then stands, the check does not run.
+          # The check reads the config's form without ajv, the one package of the core's it would read, by its own checks
+          # of that form; no step follows)
+          git reset -q --hard HEAD && git clean -ffdxq || :
+          # (git failing or warning that it cannot read a folder, and a submodule folder that cannot be listed, count as
+          # something standing there: fails closed)
+          bare() {
+            local e p f s l
+            f=$(mktemp) && git -C "${1:-.}" ls-files -s -z > "$f" || return 1
+            while IFS= read -r -d '' e; do
+              [ "${e%% *}" = 160000 ] || continue; p=$1${e#*$'\t'}
+              if [ ! -L "$p" ] && [ "${CORE_AT#"$p"/}" != "$CORE_AT" ]; then
+                git -C "$p" reset -q --hard HEAD && git -C "$p" clean -ffdxq || return 1
+                s=$(git -C "$p" status --porcelain --ignored --untracked-files=all --ignore-submodules=all 2>&1) || return 1
+                [ -z "$s" ] && bare "$p/" || return 1
+              elif [ -L "$p" ] || { [ -e "$p" ] && { ! l=$(ls -A -- "$p" 2> /dev/null) || [ -n "$l" ]; }; }; then return 1; fi
+            done < "$f"; rm -f "$f"
+          }
+          top=$(git status --porcelain --ignored --untracked-files=all --ignore-submodules=all 2>&1) || top="git could not read the checkout"
+          if [ -n "$top" ] || ! bare ""; then
+            echo "FAIL the checkout still holds what git does not know once what HEAD holds was put back (a file a step before wrote, or a folder git records as a submodule that holds files, is a link or cannot be listed), or git could not read it or warned, so the NuGet check's restore does not run. Mend: keep each folder git records as a submodule out of what a step before writes (an install's folder of packages), or take that submodule out; then run the check again"; exit 1
+          fi
           set -- nuget --nuget "$CONFIG" --base "$BASE"; [ "$ADVISORY" != true ] || set -- "$@" --advisory
           node "$CORE_AT"scripts/checks.mjs "$@"

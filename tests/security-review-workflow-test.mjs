@@ -95,7 +95,9 @@ function runCase(fx, env, tmp, { files = [{ filename: "notes.txt" }], cut = 0, c
       // the root stay on disk for the workflow to run, but git tracks them as a project would not, so the core's own
       // repository is told apart from a project's by what git tracks, core-path.mjs)
       fs.writeFileSync(path.join(ws, "core-manifest.md"), `# Core manifest\n\nCore: ${CORE} at ${"a".repeat(40)}, copied whole under ${copyAt} (never edited here).\n`);
-      execFileSync("git", ["add", "core-manifest.md"], { cwd: ws, stdio: "ignore" });
+      // (and, as a project's SECURITY.md does, the line that names its rule files, without which the code-review wait holds)
+      fs.appendFileSync(path.join(ws, "SECURITY.md"), "\n**the rule files:** `docs/rules.md`;\n");
+      execFileSync("git", ["add", "core-manifest.md", "SECURITY.md"], { cwd: ws, stdio: "ignore" });
       execFileSync("git", ["rm", "-q", "--cached", "scripts/core-path.mjs"], { cwd: ws, stdio: "ignore" });
     }
     return ws;

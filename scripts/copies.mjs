@@ -37,7 +37,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { inProject, leadsOut, linkedOut, logged, parseBounded, unrooted } from "./guards.mjs";
+import { firstLink, inProject, leadsOut, linkedOut, logged, parseBounded, unrooted } from "./guards.mjs";
 import { placeAt, readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { whole } from "./core-owned.mjs";
 import { readBlobs } from "./blobs.mjs";
@@ -72,7 +72,8 @@ const real = p => { try { return fs.realpathSync.native(p); } catch { return p; 
 let CONFIG_AT;
 try { CONFIG_AT = git(["ls-files", "-z", "--full-name", "--error-unmatch", "--", configPath]).split("\0")[0]; } catch { CONFIG_AT = path.relative(real(ROOT), path.join(real(path.dirname(path.resolve(configPath))), path.basename(configPath))).split(path.sep).join("/"); }
 let config;
-try { config = JSON.parse((linkedOut(configPath) ? null : regularText(configPath, { bound: 1 << 26 })) ?? ""); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
+if (linkedOut(configPath)) fail(`the config ${configPath} leads out of the project, or nowhere${firstLink(configPath) ? `, through the link ${firstLink(configPath)}` : ""}, so it is not read. Mend: make ${configPath} a regular file of the project's own, reached through no link that leads out of it`);
+try { config = JSON.parse(regularText(configPath, { bound: 1 << 26 }) ?? ""); } catch { fail(`cannot read the config ${configPath} as JSON. Mend: write the config as the starter kit does (${TEMPLATE}): a JSON object with "baseline", the baseline's path, "code" and "prose", lists of git pathspecs, and "proseFromSecurity": true or false`); }
 process.chdir(ROOT);
 // A key it does not know, or one of the wrong shape, would check less without a word, so it fails: its schema holds
 // the config's shape (scripts/schemas/copies.json, schemas.mjs). Where the core's packages are not installed, they are

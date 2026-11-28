@@ -34,8 +34,11 @@ export function ownFiles(root) {
   // as the project's: never git's own folder nor a file it ignores, a person's or a machine's own)
   const home = fs.realpathSync.native(root), unread = [], known = new Set(listed);
   const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
+  // (a path from the root as written, never folded as path.resolve folds it: the system reads a `..` after a link from
+  // the folder the link reached, and so does realpath, guards.mjs's unfolded)
+  const spelt = f => (path.isAbsolute(f) ? f : `${home}${path.sep}${f}`);
   const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
-    const to = path.resolve(home, f);
+    const to = spelt(f);
     if (!within(to)) return null;
     try {
       const real = fs.realpathSync.native(to), stat = fs.statSync(real);
@@ -51,7 +54,7 @@ export function ownFiles(root) {
   };
   // (whether another script may be given the path to read as this reader would: nothing there, or what it reads)
   const safe = f => {
-    try { if (!fs.lstatSync(path.resolve(home, f), { throwIfNoEntry: false })) return true; } catch { return false; }
+    try { if (!fs.lstatSync(spelt(f), { throwIfNoEntry: false })) return true; } catch { return false; }
     return (file(f)?.size ?? Infinity) <= READ_MOST;
   };
   return { listed, read, safe, unread };

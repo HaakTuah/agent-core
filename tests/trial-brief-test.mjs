@@ -44,8 +44,8 @@ ok(/outside every repository/.test(step(0)) && new RegExp(`checkout --detach ${S
 // the toolchain, the run before the sync and the run after it, in that order
 const order = ["toolchain.mjs .", "-before.json", "sync.mjs " + SHA, "pure-sync.mjs --trial " + SHA, "trial-draft.mjs <owner>/<name> <its number> " + SHA, "-after.json", "release.mjs --trial " + SHA].map(s => text.indexOf(s));
 ok(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])), "the toolchain, the run before, the sync, its reading, the draft, the run after and the record come in that order", JSON.stringify(order));
-ok(/--own --verdicts <scratch>\/<name>-before\.json/.test(step(3)) && /no check\.mjs, or one without `--verdicts`, and for every project of another owner, run `node <scratch>\/core\/scripts\/check\.mjs`/.test(step(3)), "the run before is the copy's check.mjs, or the release's where the copy has none or the project is another owner's");
-ok(/git stash pop/.test(step(7)) && /never pushed/.test(step(7)) && /--own --verdicts <scratch>\/<name>-after\.json/.test(step(7)), "the run after holds the steps' writes, committed and never pushed");
+ok(/--own --own-repository --verdicts <scratch>\/<name>-before\.json/.test(step(3)) && /no check\.mjs, or one without `--verdicts`, and for every project of another owner, run `node <scratch>\/core\/scripts\/check\.mjs`/.test(step(3)), "the run before is the copy's check.mjs, or the release's where the copy has none or the project is another owner's");
+ok(/git stash pop/.test(step(7)) && /never pushed/.test(step(7)) && /--own --own-repository --verdicts <scratch>\/<name>-after\.json/.test(step(7)), "the run after holds the steps' writes, committed and never pushed");
 
 // the pure-sync reading, and the drafts
 ok(/pure-sync\.mjs --trial [0-9a-f]{40} > <scratch>\/<name>-sync\.txt/.test(step(5)) && /stops no cut; a trial recorded without it for a project does/.test(step(5)), "the sync's reading is taken against the commit tried, to a file outside every repository");
@@ -56,7 +56,8 @@ const later = brief("fedcba9876543210fedcba9876543210fedcba98", OWN);
 const branches = t => [...t.matchAll(/(?:switch -c |refs\/heads\/|head=(?:<owner>:)?)([\w-]+)/g)].map(m => m[1]);
 ok(branches(text).join() === branches(later).join() && branches(text).includes("core-trial") && /--force HEAD:refs\/heads\/core-trial`/.test(six) && /open no second draft/.test(six) && /ls-remote origin refs\/heads\/core-trial` prints nothing, or the branch of an open draft/.test(six) && /a branch of the project's own, push nothing/.test(six) && /fresh scratch folder/.test(six), "a trial moved to a newer commit pushes to the same branch, so the same draft moves forward, from a fresh scratch folder, and no second draft is opened (#1334)", branches(text).join());
 ok(/switch -c core-trial-after/.test(step(7)) && /stays the pure sync/.test(step(7)) && !/core-trial-after/.test(six), "the steps' writes are committed on a branch of their own, never the draft's, so a retry pushes the pure sync alone");
-ok(/another owner, run `node <scratch>\/core\/scripts\/check\.mjs` with the same options instead, as in step 3, never the copy's/.test(step(7)), "the run after runs another owner's project through the release's check.mjs, as the run before does");
+ok(/another owner, run `node <scratch>\/core\/scripts\/check\.mjs` with the same options, save `--own-repository`, instead, as in step 3, never the copy's/.test(step(7)), "the run after runs another owner's project through the release's check.mjs, as the run before does");
+ok(/`--own-repository` says the clone is of the owner's own project, so that its NuGet check runs its restores: leave it out where the copy's check\.mjs does not know it, and for every project of another owner/.test(step(3)), "only the owner's own projects are run as the repository's own, so their NuGet check restores");
 
 // the record
 const eight = step(8);

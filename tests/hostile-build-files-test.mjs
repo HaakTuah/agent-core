@@ -188,6 +188,10 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
     fs.symlinkSync(path.join(away, "../deep"), path.join(away, "far")); fs.symlinkSync("far/../y.md", path.join(away, "z.md"));
     spawnSync("git", ["add", "-A"], { cwd: away });
     ok(ownFiles(away).read("y.md") === "inside\n" && ownFiles(away).read("z.md") === null, "a project's own files read no link whose `..` after a folder link leads out, though its spelling names a file of its own");
+    // (a path given with a `..` after a folder link inside the project: read where the system reads it, from the folder the link reached)
+    fs.mkdirSync(path.join(away, "docs/deep"), { recursive: true }); fs.writeFileSync(path.join(away, "docs/w.md"), "docs\n"); fs.writeFileSync(path.join(away, "w.md"), "root\n");
+    fs.symlinkSync("docs/deep", path.join(away, "near")); spawnSync("git", ["add", "-A"], { cwd: away });
+    ok(ownFiles(away).read("near/../w.md") === "docs\n", "and a path given with a `..` after a folder link inside the project reads the file the system reads there, not the one its spelling names");
   }
 }
 

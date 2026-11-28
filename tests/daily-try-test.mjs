@@ -161,6 +161,18 @@ for (const name of ["game-one", "tool-two"]) {
     ok(words.map(l => `${l.came}:${l.why}`).join() === "syncFailed:branchRefused,syncFailed:syncRefused,syncFailed:stageRefused,syncFailed:commitRefused" && !JSON.stringify(words).includes(hostile), "a sync stopped at each of its steps says which, in a word of the fixed list, and nothing a project's output said reaches the line (#1564)", JSON.stringify(words.map(l => l.why)));
   }
   ok(runs.filter(r => /--verdicts/u.test(r.args)).map(r => r.args.includes("before.json") ? "before" : "after").join() === "before,after" && runs.some(r => r.args.endsWith(` ${SHA}`)), "the run before, the sync to the commit, then the run after", ran.filter(r => r.k === "held").map(r => r.args).join(" | "));
+  {
+    // (each run says the clone is of the owner's own project, --own-repository, where its check.mjs knows it: here the
+    // copy's, which runs before, does not, and the core's, which runs after, does)
+    const leg = path.join(tmp, "legs", "own"), at = path.join(leg, "project"), core = path.join(tmp, "own-core"), calls = [];
+    fs.mkdirSync(path.join(at, "core/scripts"), { recursive: true }); git(at, "init", "-q");
+    fs.writeFileSync(path.join(leg, "private"), "false"); fs.writeFileSync(path.join(at, "core-manifest.md"), manifest);
+    fs.writeFileSync(path.join(at, "core/scripts/check.mjs"), "// [--verdicts <a file>]\n");
+    fs.mkdirSync(path.join(core, "scripts"), { recursive: true }); fs.writeFileSync(path.join(core, "scripts/check.mjs"), "// [--own-repository] [--verdicts <a file>]\n");
+    runLeg(leg, core, 8, { run: (cmd, args) => { calls.push(args.join(" ")); const v = args.indexOf("--verdicts"); if (v >= 0) fs.writeFileSync(args[v + 1], JSON.stringify({ "a/x": "passed" })); return true; }, tools: () => ({}), sha: SHA });
+    const checks = calls.filter(c => c.includes("--verdicts"));
+    ok(checks.length === 2 && !checks[0].includes("--own-repository") && checks[1].includes(" --own-repository "), "the run after gives --own-repository, where its check.mjs knows it, and the run before not, where the copy's does not", JSON.stringify(checks));
+  }
   const none = runLeg(path.join(tmp, "legs", "nothing-cloned"), path.join(tmp, "core-at"), 6, { run: () => true, sha: SHA });
   ok(none.came === "untried" && none.why === "notCloned" && none.leg === 6 && legFormed(none, SHA, 6), "a runner whose clone failed says its project was not tried, and why, in a line --file and --local read", JSON.stringify(none));
 

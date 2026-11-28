@@ -1,10 +1,12 @@
 # The NuGet check (floor rules 7, 10 and 15), for a project whose packages come from NuGet (.NET): on every pull
 # request, Dependabot's included, it restores each project file git knows from its lock file alone, with the .NET SDK
 # the runner holds (`dotnet restore --locked-mode`, NuGet's own tool, which fails where a lock file is not what the
-# project file asks for, and holds each package to the hash its lock file names), into a folder of its own; and then
-# runs the caller's own core/scripts/nuget.mjs, which holds every package in those lock files, and whatever else the
-# restore brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
-# manifest of the package the restore brought. What that script holds and does not, it says itself. A project calls
+# project file asks for, and holds each package to the hash its lock file names), each into a folder of its own, NuGet's caches inside it; and
+# after each project's restore, before the next's, runs the caller's own core/scripts/nuget.mjs on that folder (with
+# --restored and the project's lock file), which holds every package in the lock files, and whatever else the restore
+# brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
+# manifest of the package the restore brought, the folder then taken out, so that no project's restore runs beside
+# what another's brought. What that script holds and does not, it says itself. A project calls
 # this (workflow_call) from a workflow of its own of the same name, on every pull request (a private repository, as the
 # starter kit writes its call, on one that changes a file NuGet reads by name, so that no other bills a job), pinned
 # to a full commit SHA ("How a project takes the core" in README.md, point 5), passing the licence check's config, or
@@ -14,15 +16,27 @@
 # fail and passes, a restore that fails included: for a project where the check itself is at fault, while that is
 # reported to the core and mended, and never to let a package through. A restore runs the pull request's own project
 # files, as its build would, and what they run could change anything in this job after it, the script and the manifests
-# it reads included: so before the restore a step fetches every package the lock files name, and every tool a manifest
+# it reads included: so no restore runs, the first look's own neither, unless the run proves the code the repository's
+# own (a pull request whose event names this repository as its head's, or a push, a schedule, a dispatch or the
+# merge queue's run; a pull request from another repository that
+# changes what NuGet reads fails, saying its mend, and one that changes nothing it reads passes; the proof is the copy's
+# script, so it holds only where the copy is the core's, as the copies check and the host's approval of an outside
+# contributor's runs hold it, and a pull request in the merge queue counts as the repository's own, which a writer accepts by queuing it to merge); and before the restore a step fetches every package the lock files name, and every tool a manifest
 # of dotnet's names (dotnet-tools.json, in .config/ or any folder), holds each package to its lock file's content hash
 # and reads each licence from its own file (core/scripts/nuget-fetch.mjs, then nuget.mjs with --fetched; core archive
-# 201), a verdict no build has run beside (where the first look below has itself restored, it is left out: nothing it
-# reads changed from the base, whose verdict stands); after the restore the script reads nothing of git's for the base
-# (nuget.mjs with --restored), since the restore could have rewritten what git reads it by, each comparison with the
-# base having been made before it; and this runs with contents: read and no secret, nothing after the checkout holds
-# the token, and what a pull request does to its project files is the reviews' to read, as with every check that
-# builds. Where the packages come from is this restore's to say (floor rule 7): NuGet's own registry and the
+# 201), and the project's files as committed, failing a form in one that it does not read (a target, a task, a
+# download or an SDK from a package, a setting that turns how the restore runs or where a build imports from, an Import
+# it cannot follow, a global.json's setting beyond the SDK's version), where the project has a .NET project file,
+# unless the base held it or the config declares it: a verdict no build the pull request changed has run
+# beside (the first look below runs a build only where nothing it reads changed from the base, and so runs the base's
+# build files, which may run what else the pull request changed, gaining nothing the read judges); after the restore
+# the script reads nothing of git's for the base (nuget.mjs with --restored), since the restore could have rewritten
+# what git reads it by, each comparison with the base having been made before it, and what a target or a task the base
+# held or the config declares writes once the restore runs it, it reads as it finds it; and this runs with contents:
+# read and no secret, nothing after the checkout holds the token, no step of this job's own runs after it (the actions'
+# own clean-up after the job holds no more than the restore's code already reaches), and what a pull request does to
+# its project files is the reviews' to read, as with every check that builds. Where the packages come from is this
+# restore's to say (floor rule 7): NuGet's own registry and the
 # sources the config names, given to every restore, which overrules what a NuGet.Config names, and the script then
 # reads, by NuGet's own record beside each package it brought (.nupkg.metadata), that it took none from elsewhere; a
 # source that asks for a sign-in has none here. A project for Windows alone restores here all the same

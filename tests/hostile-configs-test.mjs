@@ -132,10 +132,16 @@ if (pipe(path.join(outside, "pipe"))) {
   fs.writeFileSync(path.join(outside, "out.json"), "{}\n");
   fs.symlinkSync(path.join(outside, "out.json"), path.join(p, "checks/out.json"));
   r = run("reading-size.mjs", "checks/out.json");
-  ok(fails(r), "reading-size.mjs: refuses with its mend a config that is a link leading out of the project", r.out);
+  ok(fails(r) && r.out.includes("leads out of the project, or nowhere, through the link checks/out.json"), "reading-size.mjs: refuses with its mend a config that is a link leading out of the project, naming the link", r.out);
   r = run("copies.mjs", "checks/out.json");
-  ok(fails(r) && r.out.includes("cannot read the config"), "copies.mjs: refuses with its mend a config that is a link leading out of the project", r.out);
+  ok(fails(r) && r.out.includes("leads out of the project, or nowhere, through the link checks/out.json") && !r.out.includes("as JSON"), "copies.mjs: refuses with its mend a config that is a link leading out of the project, naming the link, not as a fault of its JSON", r.out);
   fs.rmSync(path.join(p, "checks/out.json")); fs.rmSync(path.join(outside, "out.json"));
+  // (one that leads nowhere through no link, a `..` after a part that does not stand, names no link; Windows folds it
+  // by its spelling, so the case is held where a `..` is read as the system reads it)
+  if (process.platform !== "win32") for (const script of ["reading-size.mjs", "copies.mjs"]) {
+    r = run(script, "nothere/../x.json");
+    ok(fails(r) && r.out.includes("leads out of the project, or nowhere, so it is not read") && !r.out.includes("through the link"), `${script}: refuses with its mend a config that leads nowhere through no link, naming none`, r.out);
+  }
   fs.symlinkSync("folder.md", path.join(p, "inner.md"));
   gitP("add", "inner.md");
   r = sizes(marks({ split: 10 }));

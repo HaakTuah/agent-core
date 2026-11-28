@@ -49,8 +49,11 @@ export function nugetScratch(prefix) {
     const head = git(dir, "rev-parse", "HEAD");
     git(dir, "checkout", "-q", "--detach", baseSha);
     git(dir, "merge", "-q", "--no-ff", "-m", "the merge", head);
-    const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: "someone/project/.github/workflows/nuget.yml@refs/pull/1/merge", event: { pull_request: { base: { sha: baseSha } } } };
-    const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: env, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, temp: tmp });
+    const github = { event_name: "pull_request", repository: "someone/project", workflow_ref: "someone/project/.github/workflows/nuget.yml@refs/pull/1/merge", event: { pull_request: { base: { sha: baseSha }, head: { repo: { full_name: "someone/project" } } } } };
+    // (the event file GitHub gives every step, which proves the code the repository's own: checks.mjs, ownCode)
+    const event = path.join(tmp, `event-${n}.json`);
+    fs.writeFileSync(event, JSON.stringify(github.event));
+    const [job] = runWorkflow(workflow, { inputs: { config: "checks/licences.json" }, github, base: { ...env, GITHUB_EVENT_PATH: event }, workspace: () => dir, uses: { "actions/checkout": () => {}, "actions/setup-node": () => {} }, temp: tmp });
     const out = job.steps.map(x => x.out).join("");
     return { passed: job.passed, ran: [...out.matchAll(/^== (.+)$/gm)].map(m => m[1].trim()), out };
   };

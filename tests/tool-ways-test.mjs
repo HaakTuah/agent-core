@@ -178,5 +178,26 @@ ok([".kiro/specs/a/tasks.md", ".codex/prompts/p.md", "x/.kiro/notes.md", ".gemin
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
+// ---- what a commit's tree holds at a path (placeAt's held and place), on a tree given as git lists it ----
+{
+  const shown = [], chain = Array.from({ length: 41 }, (_, i) => ["120000", `c${i}`, i === 40 ? "d/f.md" : `c${i + 1}`]);
+  const entries = [["100644", "d/f.md"], ["120000", "up", "d/../d/f.md"], ["120000", "out", "../x"], ["120000", "through", "d/f.md/.."], ["120000", "self", "self"],
+    ["160000", "sub"], ["120000", "into", "sub/y.md"], ["120000", "big", "d/f.md", 160000], ...chain];
+  const at = placeAt("c", args => {
+    if (args[0] === "ls-tree") return entries.map(([mode, p, text = "x", size = text.length]) => `${mode} ${mode === "160000" ? "commit" : "blob"} ${"0".repeat(40)} ${mode === "160000" ? "-" : size}\t${p}`).join("\0");
+    const p = args[1].slice(args[1].indexOf(":") + 1), e = entries.find(x => x[1] === p);
+    shown.push(p);
+    if (!e) throw new Error("not there");
+    return e[2] ?? "x";
+  });
+  ok(at("up") === "d/f.md" && at.held("up") && at("out") === null && at.held("out") && at("through") === null && at.held("through"),
+    "a `..` a link's text brings steps back from the folder reached, while it stays inside the tree; one above the root, or after a file, leads nowhere the tree holds, and is held");
+  ok(at.held("self") && at("self") === null && at("c1") === "d/f.md" && at("c0") === null && at.held("c0"),
+    "a link that leads to itself ends, held, and so does a chain past 40 links, while one of 40 is followed");
+  ok(at.held("sub/x.md") && at.held("sub") && at.held("into") && at("into") === null, "a submodule at the path, on its way or where a link leads is held, and nothing behind it is read");
+  ok(at.held("big") && at("big") === null && !shown.includes("big"), "a link whose text is past 4096 bytes is held, and its text is never read");
+  ok(!at.held("none.md") && !at.held("d/none.md") && at.held("d"), "a path the tree holds nothing at, past every link, is not held; a folder is");
+}
+
 console.log(`${count - failed} of ${count} passed`);
 if (failed) process.exitCode = 1;

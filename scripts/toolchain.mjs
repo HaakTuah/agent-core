@@ -24,7 +24,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { leadsOut, parseBounded } from "./guards.mjs";
+import { leadsOut, liesOutside, parseBounded } from "./guards.mjs";
 import { started } from "./started.mjs";
 
 export const HOST = "builds.dotnet.microsoft.com";
@@ -109,7 +109,7 @@ function placed({ project, home, env, platform, arch }) {
   const rid = ridOf(platform, arch);
   if (!rid) return { said: `NOT FETCHED: the .NET SDK ${version} (this machine, ${platform} on ${arch}, is none the list holds sums for: ${Object.keys(RIDS).join(", ")}). ${NOT_RUN}` };
   const root = path.resolve(home, ".agent-core", "toolchains", `dotnet-sdk-${version}-${rid}`);
-  if (!leadsOut(project, root)) return { said: `NOT FETCHED: the .NET SDK ${version} (its folder, ${root}, would stand inside the project). Mend: run this with a home folder outside the project.` };
+  if (!liesOutside(project, root)) return { said: `NOT FETCHED: the .NET SDK ${version} (its folder, ${root}, would stand inside the project, or where a link on its way leads cannot be told). Mend: run this with a home folder outside the project, reached through no link that leads nowhere.` };
   return { version, rid, root };
 }
 

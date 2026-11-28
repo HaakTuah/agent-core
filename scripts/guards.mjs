@@ -6,7 +6,9 @@
 //
 // A known limit: a file's real place is the system's answer (realpathSync.native); where the system cannot give one,
 // as some drives on Windows cannot (a RAM disk, a virtual file system), every path there reads as leading out, so a
-// check refuses what it would read rather than read it unchecked.
+// check refuses what it would read rather than read it unchecked. And on Windows, which folds a `.` or `..` in a path by
+// its spelling, a path whose `.` or `..` stands after a part that does not (`missing\.\x`) stays where its spelling says,
+// yet reads here as neither inside nor outside: it is refused where a check asks either, never let through.
 //
 //   import { inProject, leadsOut, logged } from "./guards.mjs";
 import fs from "node:fs";
@@ -44,10 +46,19 @@ export const unfolded = at => {
  *  under a linked folder leads out too; a link that leads nowhere counts as leading out, and so does a path whose `..`
  *  or `.` stands after a part that does not, which a write that makes its folders could follow anywhere. `at` is read
  *  as written (unfolded), so a `..` after a link leads where a read of `at` leads. */
-export function leadsOut(root, at) {
+export const leadsOut = (root, at) => placed(root, at) !== "in";
+
+/** Whether `at` surely lies outside `root`, as leadsOut reads it: its real place, or that of the nearest folder above it
+ *  that stands, is outside root's. Not leadsOut's opposite: a link that leads nowhere, a `.` or `..` after a part that
+ *  does not stand, and a root with no real place are neither inside nor outside, so a check that allows only what lies
+ *  outside the project asks this, and refuses them. */
+export const liesOutside = (root, at) => placed(root, at) === "out";
+
+// (where `at` lies against `root`: "in", "out", or "unsure" where it cannot be told)
+function placed(root, at) {
   let top;
   // (the system's own realpath, which reads a `..` after a link from the folder the link reached, as a read does)
-  try { top = fs.realpathSync.native(root); } catch { return true; }
+  try { top = fs.realpathSync.native(root); } catch { return "unsure"; }
   // (with no separator at its end, which would have a link that leads nowhere read as a folder that is not there)
   let p = unfolded(at);
   for (const { root: drive } = path.parse(p); p.length > drive.length && (p.endsWith(path.sep) || p.endsWith("/"));) p = p.slice(0, -1);
@@ -56,16 +67,31 @@ export function leadsOut(root, at) {
     try { real = fs.realpathSync.native(p); } catch {
       let found;
       try { found = fs.lstatSync(p, { throwIfNoEntry: false }); } catch { found = undefined; }
-      if (found?.isSymbolicLink() || [".", ".."].includes(path.basename(p))) return true;
+      if (found?.isSymbolicLink() || [".", ".."].includes(path.basename(p))) return "unsure";
       const up = path.dirname(p);
-      if (up === p) return true;
+      if (up === p) return "unsure";
       p = up;
       continue;
     }
     const rel = path.relative(top, real);
-    return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
+    return rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel) ? "out" : "in";
   }
 }
+
+/** The first link on the way to `at`, as written from the folder it is run from, `at` itself included; null where none
+ *  stands there: for a refusal that names the link to mend. */
+export const firstLink = at => {
+  const parts = String(at).split(process.platform === "win32" ? /[\\/]/u : "/");
+  for (let i = 1; i <= parts.length; i++) {
+    const p = parts.slice(0, i).join(path.sep);
+    if (!p || p === "." || p === "..") continue;
+    let found;
+    try { found = fs.lstatSync(p, { throwIfNoEntry: false }); } catch { return null; }
+    if (!found) return null;
+    if (found.isSymbolicLink()) return p;
+  }
+  return null;
+};
 
 /** Text with every control character and line separator shown as "?": on one line, and, where it changes nothing,
  *  text that held none. */

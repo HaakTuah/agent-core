@@ -90,6 +90,8 @@ const { tmp, git } = scratchCore("release-trial-test-");
   ok(ownCount(listed) === 2 && ownCount("**The projects that take the core**\n- None found.") === 0, "the owner's projects are counted from what state-report.mjs --projects prints, in shownAs's words: its own public and private, never another owner's, a note or none found");
   const inCore = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), "--trial", later, path.join(path.dirname(fileURLToPath(import.meta.url)), "before.json"), path.join(tmp, "after.json")], { encoding: "utf8" });
   ok(inCore.status === 1 && /lies in the core's own repository/.test(inCore.stderr), "--trial refuses a run's verdicts kept in the core's own repository, where a project's job names could be committed", inCore.stderr);
+  const here = path.dirname(fileURLToPath(import.meta.url)), unsure = spawnSync(process.execPath, [path.join(here, "..", "scripts", "release.mjs"), "--trial", later, [here, "nothere", "..", "before.json"].join(path.sep), path.join(tmp, "after.json")], { encoding: "utf8" });
+  ok(unsure.status === 1 && /or where a link on its way leads cannot be told/.test(unsure.stderr), "and one named by a `..` after a part of the core's repository that does not stand, where it leads cannot be told", unsure.stderr);
   const releaseMjs = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "release.mjs"), runs = path.join(tmp, "runs.json"), said = path.join(tmp, "said.txt");
   fs.writeFileSync(runs, JSON.stringify(one[0])); fs.writeFileSync(said, "a pure sync: core a -> b\nmerge it with sha=x\n");
   const cliRun = (...args) => spawnSync(process.execPath, [releaseMjs, "--trial", later, ...args], { encoding: "utf8" });
