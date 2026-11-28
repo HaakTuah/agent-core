@@ -424,9 +424,27 @@ jobs:
           CONFIG: ${{ inputs.nuget }}
           ADVISORY: ${{ inputs.advisory }}
         run: |
-          # (every file git does not know that the steps before wrote in the checkout taken out first, the packages they
-          # installed from the pull request's lock files among them, so the restore finds there what git knows alone, as
-          # in nuget.yml's job of its own; the check's scripts need none of the core's packages, and no step follows)
-          git clean -ffdxq
+          # (what HEAD holds put back first, contents and modes, and every file git does not know taken out, ignored ones and
+          # nested repositories among them: what the steps before wrote or changed in the checkout, the packages they
+          # installed from the pull request's lock files and the core's own among them, so the restore finds what HEAD
+          # holds alone. The same in the submodule that carries the core, where one does, which this job checked out, and
+          # in each folder of it; any other folder git records as a submodule, which git's clean leaves as it stands, must
+          # hold nothing, and no git runs inside it. Where anything git does not know then stands, the check does not run.
+          # The check reads the config's form without ajv, the one package of the core's it would read, by its own checks
+          # of that form; no step follows)
+          git reset -q --hard HEAD && git clean -ffdxq
+          bare() {
+            local e p
+            while IFS= read -r -d '' e; do
+              [ "${e%% *}" = 160000 ] || continue; p=$1${e#*$'\t'}
+              if [ ! -L "$p" ] && [ "${CORE_AT#"$p"/}" != "$CORE_AT" ]; then
+                git -C "$p" reset -q --hard HEAD && git -C "$p" clean -ffdxq || return 1
+                [ -z "$(git -C "$p" status --porcelain --ignored --untracked-files=all --ignore-submodules=all)" ] && bare "$p/" || return 1
+              elif [ -L "$p" ] || [ -n "$(ls -A -- "$p" 2> /dev/null)" ]; then return 1; fi
+            done < <(git -C "${1:-.}" ls-files -s -z)
+          }
+          if [ -n "$(git status --porcelain --ignored --untracked-files=all --ignore-submodules=all)" ] || ! bare ""; then
+            echo "FAIL the checkout still holds what git does not know once what HEAD holds was put back (a file a step before wrote, or a folder git records as a submodule that holds files), so the NuGet check's restore does not run. Mend: keep each folder git records as a submodule out of what a step before writes (an install's folder of packages), or take that submodule out; then run the check again"; exit 1
+          fi
           set -- nuget --nuget "$CONFIG" --base "$BASE"; [ "$ADVISORY" != true ] || set -- "$@" --advisory
           node "$CORE_AT"scripts/checks.mjs "$@"

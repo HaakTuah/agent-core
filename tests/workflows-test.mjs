@@ -646,8 +646,44 @@ exit 1
   // (in core.yml's one job, the NuGet check runs on a checkout holding only what git knows: every file the steps before
   // wrote there is taken out before its script runs, and no step follows it)
   const coreSteps = steps.filter((s) => s.file === "core.yml"), nugetRun = String(at("core.yml", "The NuGet check, last").run ?? "");
-  const cleaned = /^\s*git clean -ffdxq?\s*$/mu.exec(nugetRun), runsAt = nugetRun.indexOf("scripts/checks.mjs");
-  ok(cleaned && cleaned.index < runsAt && coreSteps.at(-1)?.step.name === "The NuGet check, last", "core.yml's NuGet step takes every file git does not know out of the checkout before its check runs, and is the job's last", nugetRun);
+  ok(coreSteps.at(-1)?.step.name === "The NuGet check, last", "core.yml's NuGet step is the job's last", coreSteps.at(-1)?.step.name);
+  if (process.platform !== "win32") nugetStepCases(nugetRun);
+}
+// (the step run as GitHub runs it, on a checkout the steps before changed: what HEAD holds put back, every file git does
+// not know taken out, the submodule that carries the core's too, and the check started only where nothing else stands)
+function nugetStepCases(run) {
+  const dir = scratchDir("nuget-step-"), env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/u.test(k)));
+  const git = (cwd, ...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "protocol.file.allow=always", ...args], { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put = (root, f, text, mode) => { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), text, mode ? { mode } : undefined); };
+  // (a stand-in for the check: it says it ran, and what the checkout then holds beside what git knows)
+  const STUB = `import { execFileSync } from "node:child_process";\nconsole.log("ran " + execFileSync("git", ["status", "--porcelain", "--ignored", "--untracked-files=all"], { encoding: "utf8" }).trim().length);\n`;
+  const step = (cwd, coreAt) => spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", run], { cwd, env: { ...env, CORE_AT: coreAt, CONFIG: "c.json", BASE: "HEAD^1", ADVISORY: "false" }, encoding: "utf8" });
+  const repo = path.join(dir, "p"); fs.mkdirSync(repo); git(repo, "init", "-q");
+  put(repo, "core/scripts/checks.mjs", STUB); put(repo, "a.txt", "a\n"); put(repo, "b.txt", "b\n"); put(repo, "c.sh", "echo c\n"); put(repo, ".gitignore", "*.log\n");
+  git(repo, "add", "-A"); git(repo, "commit", "-q", "-m", "one");
+  put(repo, "a.txt", "changed\n"); fs.rmSync(path.join(repo, "b.txt")); fs.chmodSync(path.join(repo, "c.sh"), 0o755); put(repo, "u.txt", "u\n"); put(repo, "x.log", "x\n"); put(repo, "node_modules/p/index.js", "x\n");
+  let r = step(repo, "core/");
+  ok(r.status === 0 && r.stdout.includes("ran 0") && fs.readFileSync(path.join(repo, "a.txt"), "utf8") === "a\n" && fs.existsSync(path.join(repo, "b.txt")) && !(fs.statSync(path.join(repo, "c.sh")).mode & 0o111) && !fs.existsSync(path.join(repo, "u.txt")) && !fs.existsSync(path.join(repo, "x.log")) && !fs.existsSync(path.join(repo, "node_modules")),
+    "core.yml's NuGet step puts back each file git knows as HEAD holds it, its mode too, and takes out every file it does not, before its check runs", r.stdout + r.stderr);
+  // (a folder git records as a submodule, which git's clean leaves as it stands: one that holds a file stops the check)
+  const head = git(repo, "rev-parse", "HEAD").trim();
+  git(repo, "update-index", "--add", "--cacheinfo", `160000,${head},ext/lib`); git(repo, "commit", "-q", "-m", "a submodule");
+  put(repo, "ext/lib/x.props", "<Project />");
+  r = step(repo, "core/");
+  ok(r.status === 1 && !r.stdout.includes("ran") && /^FAIL the checkout still holds what git does not know/mu.test(r.stdout) && r.stdout.includes("Mend: ") && fs.existsSync(path.join(repo, "ext/lib/x.props")),
+    "and where a folder git records as a submodule holds a file, the check does not run, and the step fails saying its mend", r.stdout + r.stderr);
+  fs.rmSync(path.join(repo, "ext/lib/x.props"));
+  r = step(repo, "core/");
+  ok(r.status === 0 && r.stdout.includes("ran 0"), "an empty one stops nothing", r.stdout + r.stderr);
+  // (the submodule that carries the core, which the job checked out: put back and cleaned too, its own empty submodule
+  // folders checked as the project's are)
+  const lib = path.join(dir, "lib"); fs.mkdirSync(lib); git(lib, "init", "-q"); put(lib, "core/scripts/checks.mjs", STUB); put(lib, "core/x.txt", "x\n"); git(lib, "add", "-A"); git(lib, "commit", "-q", "-m", "lib");
+  const carried = path.join(dir, "q"); fs.mkdirSync(carried); git(carried, "init", "-q"); put(carried, "a.txt", "a\n"); git(carried, "add", "-A"); git(carried, "commit", "-q", "-m", "one");
+  git(carried, "submodule", "add", "-q", lib, "vendor/lib"); git(carried, "commit", "-q", "-m", "the library");
+  put(carried, "vendor/lib/core/.packages/node_modules/ajv/index.js", "x\n"); put(carried, "vendor/lib/core/x.txt", "changed\n");
+  r = step(carried, "vendor/lib/core/");
+  ok(r.status === 0 && r.stdout.includes("ran 0") && !fs.existsSync(path.join(carried, "vendor/lib/core/.packages")) && fs.readFileSync(path.join(carried, "vendor/lib/core/x.txt"), "utf8") === "x\n",
+    "in the submodule that carries the core, each file git knows is put back and every file it does not taken out, and the check runs", r.stdout + r.stderr);
 }
 
 // (#1311: a job's own limit cancels the whole job, which skips the steps after it; so the daily look's step has a limit

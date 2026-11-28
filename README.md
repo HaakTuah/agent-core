@@ -350,10 +350,13 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      request changed has run beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are
      fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
      with a tool the pull request's base held, never read before this release, is reported, not failed). That read runs
-     before every restore of the check's, and reads the project's files as committed: a target, a task, a download or
-     an SDK from a package, a setting that turns how the restore runs, an Import it cannot follow, a global.json's
-     setting beyond the SDK's version, or a program (by its first bytes, or a file git records as one that runs), fails there unless the base held it in the same file or the config's "nuget.unread" declares it as the failure
-     prints it, for the reviews to read what it brings in.
+     before every restore of the check's, and reads the project's files as committed, where the project has a .NET
+     project file: a target, a task, a download or an SDK from a package, a setting that turns how the restore runs or
+     where a build imports a project's generated files from, an Import it cannot follow, a global.json's setting beyond
+     the SDK's version, or a program (by its first bytes, or a file git records as one that runs), fails there unless
+     the base held it in the same file or the config's "nuget.unread" declares it by the exact line the failure prints,
+     for the reviews to read what it brings in; a program that leads to no file of bytes of the project's own, or a
+     path the base held as one that now does, fails whatever is declared.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull

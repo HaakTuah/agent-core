@@ -21,14 +21,20 @@
 //     an item that downloads a package or names a pack the SDK downloads (PackageDownload, _PackageToDownload,
 //     DotNetCliToolReference, the Known* items), an SDK taken from a package (a project's or an Import's named with a
 //     version, an Sdk element with one), a setting that turns the restore to the way that starts a process a property
-//     names (RestoreUseStaticGraphEvaluation, NuGetConsoleProcessFileName, whatever their value), or an Import or such
-//     a property it cannot follow; in a global.json, anything but the SDK's own version, roll-forward and pre-release
+//     names (RestoreUseStaticGraphEvaluation, NuGetConsoleProcessFileName), names what the restore loads
+//     (RestoreTaskAssemblyFile) or moves the folder a build imports a project's generated files from
+//     (MSBuildProjectExtensionsPath, BaseIntermediateOutputPath, ArtifactsPath), whatever their value, or an Import or
+//     such a property it cannot follow; in a global.json, anything but the SDK's own version, roll-forward and pre-release
 //     ("msbuild-sdks", "sdk.paths" and the like); and any file that is a program, which a restore may be made to load
 //     or start: one whose first bytes say so (isProgram, a script's "#!" among them) or that git records as one that
-//     runs (100755), of any size, hashed as it is read. Each is a line that names it by its text's or its bytes'
-//     whole hash, so that any change to it is another line, and fails but where the base held it in the same
-//     file (by its lines, counted, as an audit's "fetches"), or the config's "nuget.unread" declares it word for word,
-//     as the failure prints it; a line declared that no form matches fails. The declaration is read from the config as
+//     runs (100755), of any size, hashed as it is read; a link the base held as one is held only where it leads, now as
+//     then, to a file inside the project that stands as the base held it. Each is a line that names it by its text's
+//     or its bytes' whole hash, so that any change to it is another line, and fails but where the base held it in the
+//     same file (by its lines, counted, as an audit's "fetches"), or the config's "nuget.unread" declares it word for
+//     word, as the failure prints it, with the exact line to add; a line declared that no form matches fails. A
+//     program that leads to no file of bytes of the project's own, or cannot be hashed, and a path the base held as a
+//     program that now leads to none (a link out of the project, a folder, a device), fail whatever is declared, and
+//     the first look lists each such path. None of this is read where the project has no .NET project file. The declaration is read from the config as
 //     the pull request holds it, as an audit entry's "fetches" is read from the audit it holds: one a pull request
 //     adds stands in its diff, in a protected file, for the reviews to read. A document type fails but where its
 //     file stands as the base held it, and is never declared. An Import it cannot follow, held or declared, stands for
@@ -88,7 +94,8 @@
 // added), each running as the base wrote it or the config declares it; a file such a target or task runs that is no
 // program (a script), which a pull request changes, runs at the first look's own build too, before the read, where
 // nothing else the look reads changed, and gains there nothing over what it may write after the read, since nothing
-// the read judges differs from the base's.
+// the read judges differs from the base's. So too what a program the base held, or the config declares, does once a
+// restore starts it, and what a folder outside the checkout holds that a setting the base held points a build at.
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
@@ -114,8 +121,10 @@
 //   node core/scripts/nuget.mjs --imports      the files of another name than a build file's that an Import, or a
 //                                               property MSBuild's own targets import a file by, brings in, and
 //                                               every file of the project's whose root element is a Project, or
-//                                               that begins as XML past the bound this check reads to, a line
-//                                               each: what the workflow's first look adds to what it diffs
+//                                               that begins as XML past the bound this check reads to, and, where
+//                                               the project has a .NET project file, each program and each path the
+//                                               base held as one that now leads to no file of bytes, a line each:
+//                                               what the workflow's first look adds to what it diffs
 //   node core/scripts/nuget.mjs <config> --sources   where the workflow's restore takes packages from, a line each,
 //                                                    a folder by its whole path
 //
@@ -235,7 +244,7 @@ function passedOver(text, i) {
 // downloads a package or names a pack the SDK downloads, whole, and the tag of a project or an Import whose SDK comes
 // from a package. One with no end is read to the file's.
 // (and the two settings that turn the restore to the way that starts a process a property names, whatever their value)
-const WHOLE = /^(?:target|usingtask|packagedownload|_packagetodownload|dotnetclitoolreference|known[a-z0-9_.-]*|restoreusestaticgraphevaluation|nugetconsoleprocessfilename)$/iu;
+const WHOLE = /^(?:target|usingtask|packagedownload|_packagetodownload|dotnetclitoolreference|known[a-z0-9_.-]*|restoreusestaticgraphevaluation|nugetconsoleprocessfilename|restoretaskassemblyfile|msbuildprojectextensionspath|baseintermediateoutputpath|artifactspath)$/iu;
 const collapsed = (s) => s.replace(/\s+/gu, " ").trim();
 // (a form as a line: its text, its blanks collapsed so that it reads on one line, and the hash of its text as written,
 // line endings aside, so that a line stands for that text alone)
@@ -495,9 +504,10 @@ function doctypeEnd(text, from) {
  * SDK's targets import by a property this check does not list), read as a build file is. A file is opened only where
  * it is a file of bytes, and read whole only where its first character past blanks is "<" and it is within BOUND bytes;
  * one past it is added to `past`, unread, and one that begins as a program (isProgram), or that git records as one
- * that runs (`runs`, from executables), to `programs`, unread, of whatever size and name, a build file's too.
+ * that runs (`runs`, from executables), to `programs`, unread, of whatever size and name, a build file's too; one that
+ * leads out of the project, is no file of bytes (a folder, a device, a pipe) or cannot be opened, to `blind`.
  */
-export function projectFilesByContent(root, own, past = [], programs = [], runs = new Set()) {
+export function projectFilesByContent(root, own, past = [], programs = [], runs = new Set(), blind = []) {
   const out = [];
   for (const f of own) {
     if (runs.has(f)) { programs.push(f); continue; }
@@ -505,10 +515,11 @@ export function projectFilesByContent(root, own, past = [], programs = [], runs 
     let fd = null;
     try {
       const at = join(root, f);
-      if (leadsOut(root, at)) continue; // (a link that leads out of the project: no file of its own, never opened)
+      if (leadsOut(root, at)) { blind.push(f); continue; } // (a link that leads out of the project: no file of its own, never opened)
       fd = openSync(at, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
       const st = fstatSync(fd);
-      if (!st.isFile() || st.size === 0) continue;
+      if (!st.isFile()) { blind.push(f); continue; }
+      if (st.size === 0) continue;
       const head = Buffer.alloc(Math.min(st.size, 4096));
       readSync(fd, head, 0, head.length, 0);
       if (isProgram(head)) { programs.push(f); continue; }
@@ -516,17 +527,18 @@ export function projectFilesByContent(root, own, past = [], programs = [], runs 
       if (start === "" ? st.size <= head.length : !start.startsWith("<")) continue;
       if (st.size > BOUND) { past.push(f); continue; }
       if (projectRooted(markedText(bytesOf(fd, st.size)))) out.push(f);
-    } catch { /* (a file that cannot be read is no project) */ } finally { if (fd !== null) closeSync(fd); }
+    } catch { blind.push(f); /* (a file that cannot be read is no project) */ } finally { if (fd !== null) closeSync(fd); }
   }
   return out;
 }
 // (the files git records as ones that run, mode 100755, which a restore's process may be started as, whatever their
 // first bytes)
 export function executables(root) {
-  try {
-    const entries = execFileSync("git", ["ls-files", "-s", "-z"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 });
-    return new Set(entries.split("\0").filter((e) => e.startsWith("100755 ")).map((e) => e.slice(e.indexOf("\t") + 1)));
-  } catch { return new Set(); }
+  // (outside a repository git tracks nothing, so nothing runs by its mode; inside one, where git cannot list them, the
+  // check fails, as it does where git cannot list the tracked files: never none)
+  try { execFileSync("git", ["rev-parse", "--git-dir"], { cwd: root, stdio: "ignore" }); } catch { return new Set(); }
+  const entries = execFileSync("git", ["ls-files", "-s", "-z"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 });
+  return new Set(entries.split("\0").filter((e) => e.startsWith("100755 ")).map((e) => e.slice(e.indexOf("\t") + 1)));
 }
 // (the sha256 of a file of bytes of the project's own, read a mebibyte at a time to the size it was checked at, so a
 // program of any size is hashed without being held in memory; null where it is no such file)
@@ -542,14 +554,16 @@ function hashOfFile(root, f) {
     return hash.digest("hex");
   } catch { return null; } finally { if (fd !== undefined) closeSync(fd); }
 }
-// (a file past BOUND stands as the base held it where git holds the same entry at it as the base did and, for a file
-// of bytes, the checkout's file hashes to the base's blob as git would store it under the base's attributes, never
-// the pull request's: hashed, never read into memory)
+// (a file past BOUND, or a program, stands as the base held it where git holds the same entry at it as the base did
+// and the checkout's file hashes to the base's blob as git would store it under the base's attributes, never the pull
+// request's: hashed, never read into memory; a link, where it leads, now as at the base, to a file inside the project
+// that so stands, never by its own entry alone)
 function heldPast(c, f) {
   if (!sameEntryAsBase(c, f)) return false;
-  const was = baseTree(c).get(f);
-  if (was.mode === "120000") return true;
-  try { return execFileSync("git", [`--attr-source=${c.base}`, "--literal-pathspecs", "hash-object", "--", f], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 60000 }).trim() === was.id; } catch { return false; }
+  const at = baseFile(c, f);
+  if (at === null) return false;
+  if (at !== f) { try { if (realpathSync(join(c.root, f)) !== realpathSync(join(c.root, at))) return false; } catch { return false; } return heldPast(c, at); }
+  try { return execFileSync("git", [`--attr-source=${c.base}`, "--literal-pathspecs", "hash-object", "--", f], { cwd: c.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 60000 }).trim() === baseTree(c).get(f).id; } catch { return false; }
 }
 // what a reader gives for a path git knows that leads to no file of bytes of the project's own (NOT_A_FILE_IS), which is
 // never read: a device can be endless, a pipe never ends, and a file outside the project is none of its own (#446)
@@ -902,12 +916,12 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false, lock = null } = {}) {
+export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false, lock = null, configPath = null } = {}) {
   const copy = copyAside(root), { ships, tools, accepted, sources, unread } = nugetConfig(config, copy);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (the check's own state, which the parts below read and add to)
-  const c = { config, root, copy, base, packagesDir, fetched, restored, lock, lists, allowedFor, ships, tools, unread, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
+  const c = { config, root, copy, configPath, base, packagesDir, fetched, restored, lock, lists, allowedFor, ships, tools, unread, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
   const own = tracked.filter((f) => !under(f, copy));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   // (what the tree alone says, read for every project by the read before the restore, which fails first where it
@@ -922,7 +936,7 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
 
   c.lockTexts = new Map();
   const packages = lockedPackages(c, listed, locks);
-  const toolsRead = toolsNamed(c, own, packages);
+  const toolsRead = toolsNamed(c, own, packages, lock === null ? failures : []);
   const unnamed = addRestored(c, packages);
   const entries = auditEntries(config, root);
   // (an entry is a NuGet package's only where it says so: one of the same name for anything else covers none)
@@ -999,8 +1013,8 @@ function layoutFaults({ root, copy, failures }, tracked, own, locks) {
 function buildFileFaults(c, own) {
   c.bytesNow = new Map();
   const past = [];
-  c.programs = [];
-  c.byContent = new Set(projectFilesByContent(c.root, own, past, c.programs, executables(c.root)));
+  c.programs = []; c.blind = []; c.runs = executables(c.root);
+  c.byContent = new Set(projectFilesByContent(c.root, own, past, c.programs, c.runs, c.blind));
   for (const f of past) {
     const what = `${f} begins as XML and is past ${BOUND} bytes, so this check does not read whether its root element is a Project: what it names, where MSBuild imports it by a property, goes unseen`;
     if (!c.base || heldPast(c, f)) c.reports.push(`${what} ${heldBefore}`);
@@ -1025,10 +1039,13 @@ function buildFileFaults(c, own) {
 // Each form the read before the restore does not read (formsIn, globalForms, a program, and an Import it cannot follow): one the
 // config's "nuget.unread" declares word for word, or the base held in the same file, is reported; any other fails,
 // and so does a line declared that no form matches. With no base, each is reported; after the restore, which the read
-// before it held them in, none is read.
+// before it held them in, none is read; nor where the project has no .NET project file, which no restore then reads.
+// A program that leads to no file of bytes of the project's own, or that the base held as one and that now does, fails
+// whatever the base held or the config declares: no line can name what it leads to.
 function formFaults(c, own) {
-  if (c.restored) return;
-  const now = formsOf(c.now, own, (f) => readNow(c, f), c.programs, (f) => hashOfFile(c.root, f) ?? undefined);
+  if (c.restored || !own.some((f) => PROJECT.test(f))) return;
+  const hashes = programFaults(c);
+  const now = formsOf(c.now, own, (f) => readNow(c, f), c.programs, (f) => hashes.get(f));
   for (const f of new Set([...now.keys(), ...Object.keys(c.unread)])) {
     const forms = now.get(f) ?? [], { left, stale } = takeEach(forms.map((x) => x.line), Object.hasOwn(c.unread, f) ? c.unread[f].map(collapsed) : []);
     for (const line of stale) c.failures.push(`the config's "nuget.unread" declares, for ${f}, ${line}, which is no form this check finds there. Mend: write it as this check prints the form, or take it out where the form is gone`);
@@ -1041,9 +1058,41 @@ function formFaults(c, own) {
       const fails = unheld.indexOf(line);
       if (fails < 0) { c.reports.push(`${f} ${what} ${c.base ? heldBefore : "(reported, and passes)"}`); continue; }
       unheld.splice(fails, 1);
-      c.failures.push(`${f} ${what}. Mend: take it out; or, where it stays, declare it under "${f}" in the config's "nuget.unread" as this line prints it (${line}), for the reviews to read what it brings in`);
+      c.failures.push(formFailure(c, f, what, line, hashes.has(f)));
     }
   }
+}
+// (what fails of the programs, each hashed once: one that cannot be hashed, and a path the base held as one that now
+// leads to no file of bytes; the hashes, null for one that cannot be hashed)
+function programFaults(c) {
+  const hashes = new Map(c.programs.map((f) => [f, hashOfFile(c.root, f)]));
+  for (const f of c.programs.filter((g) => hashes.get(g) === null)) c.failures.push(`${f} is a program (by its first bytes or git's mode) that leads to no file of bytes of the project's own, or that this check could not read to hash it: a restore may be made to start whatever stands there. Mend: make it a file of the project's own${c.runs.has(f) ? `, or drop its exec bit (git update-index --chmod=-x -- ${f})` : ""}, or take it out of git`);
+  if (c.base) for (const f of c.blind.filter((g) => wasProgram(c, g))) c.failures.push(`${f} was a program at the base and now leads to no file of bytes of the project's own (a link that leads out of the project, a folder, a device, or a file that cannot be read): a restore the base's files start it by would start whatever stands there. Mend: make it a file of the project's own again, or take it out of git`);
+  return hashes;
+}
+// (a form's failure, worded for a session with no rule file open: the file, the exact line to declare and where)
+function formFailure(c, f, what, line, program) {
+  const where = c.configPath ? `${c.configPath}, the licence check's config` : "the licence check's config";
+  const exec = program && byModeAlone(c, f) ? `; or drop its exec bit (git update-index --chmod=-x -- ${f}), where it need not run` : "";
+  return `${f} ${what}. Mend: take it out${exec}; or, where it stays, add to ${where}, in "nuget.unread" (its "nuget": { "unread": { "<file>": [<lines>] } }), under "${f}", this exact line: ${JSON.stringify(line)}. The line stands for ${program ? "the file's bytes at their hash" : "the form as it is written"}, so any change to it needs a line of its own, which the reviews read`;
+}
+// (whether the base held `f` as a program: one git recorded as one that runs, or whose first bytes say so, a link
+// followed to the file it led to)
+function wasProgram(c, f) {
+  const at = baseFile(c, f);
+  if (at === null) return false;
+  const { mode, id } = baseTree(c).get(at);
+  if (mode === "100755") return true;
+  // (its first bytes alone, never the whole blob: past them git is stopped, and what it gave is read)
+  let head;
+  try { head = execFileSync("git", ["cat-file", "blob", id], { cwd: c.root, stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 }); } catch (e) { head = e.stdout; }
+  return isProgram(head);
+}
+// (a program only by git's mode: no first bytes say so, so dropping the mode is a mend)
+function byModeAlone(c, f) {
+  if (!c.runs.has(f)) return false;
+  let fd;
+  try { fd = openSync(join(c.root, f), constants.O_RDONLY | (constants.O_NONBLOCK ?? 0)); return !isProgram(bytesOf(fd, Math.min(fstatSync(fd).size, 8))); } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
 }
 // (the forms of each file, as its lines and what is said of each: of a build file read, and of a global.json)
 function formsOf(reading, own, read, programs, programHash) {
@@ -1057,10 +1106,9 @@ function formsOf(reading, own, read, programs, programHash) {
     for (const line of globalForms(read(f))) add(f, line, `holds what the read before the restore does not read (an SDK from a package, a folder of SDKs): ${line}`);
   }
   // (a program, which a build, the SDK or NuGet may be made to load or start, by a property as by a task: by its bytes'
-  // hash, of whatever size; one that cannot be hashed fails the check)
+  // hash, of whatever size; one that cannot be hashed is no line, and fails in formFaults)
   for (const f of programs) {
     const hash = programHash(f);
-    if (hash === undefined) throw new Error(`${f} is a program this check could not read to hash it. Mend: make it a file of the project's own, or take it out`);
     if (hash !== null) { const line = `a program, its bytes' sha256 ${hash}`; add(f, line, `is ${line}, which a restore may be made to load or start and the read before it does not read`); }
   }
   return out;
@@ -1177,7 +1225,7 @@ function lockedPackages(c, listed, locks) {
       // (the entry kept is the one kept before this was said, so the file read is the one read then)
       if (was && was.contentHash !== p.contentHash) {
         const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
-        if (lockAsBase(c, f, text) && lockAsBase(c, was.lock, lockText(c, was.lock))) c.reports.push(`${x} ${heldBefore}`); else if (c.lock === null) c.failures.push(x);
+        if (lockAsBase(c, f, text) && lockAsBase(c, was.lock, lockText(c, was.lock))) c.reports.push(`${x} ${heldBefore}`); else failures.push(x);
       }
       if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f, locks: new Set([...(was?.locks ?? []), f]) });
       else was.locks.add(f);
@@ -1200,12 +1248,13 @@ function lockText(c, f, failures = c.failures) {
 
 // the tools a manifest of dotnet's names, read before the restore alone (no restore brings them), each held to the
 // tools' list, one exact version each (nuget-fetch.mjs fetched them); after the restore, a yes or an audit entry for
-// one of them stands, since the check before it read that tool
-function toolsNamed(c, own, packages) {
+// one of them stands, since the check before it read that tool; with --lock, what is wrong with a manifest itself is
+// not said again (`failures` empty), the read before the restore having said it
+function toolsNamed(c, own, packages, failures) {
   const toolsRead = new Set();
   for (const f of own.filter((t) => posix.basename(t).toLowerCase() === "dotnet-tools.json")) {
     let manifest = {};
-    const text = lockText(c, f);
+    const text = lockText(c, f, failures);
     if (text === null) continue;
     try { manifest = parseBounded(unmarked(text)); } catch { if (c.fetched) (!c.base || textAt(c.root, c.base, f) === text ? c.reports : c.failures).push(`${f} is not JSON`); }
     if (!c.fetched) {
@@ -1341,10 +1390,15 @@ if (guard(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), past = [], programs = [], byContent = projectFilesByContent(root, own, past, programs, executables(root));
+      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), past = [], programs = [], blind = [];
+      const byContent = projectFilesByContent(root, own, past, programs, executables(root), blind);
       // (one past the bound too, unread: whether MSBuild imports it is unseen, so a change to it alone is one to check;
-      // and each program, which a build, the SDK or NuGet may load or start, a file git records as one that runs among them)
-      files = [...new Set([...byContent, ...past, ...programs, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
+      // and, where the project has a .NET project file, each program, which a build, the SDK or NuGet may load or start,
+      // a file git records as one that runs among them, and each path that leads to no file of bytes of the project's
+      // own that the base held as a program: one the check fails)
+      const c = { root, copy, base: baseOf(root), tree: null }, dotnet = projectFiles(tracked, copy).length > 0;
+      const gone = dotnet ? blind.filter((f) => !c.base || wasProgram(c, f)) : [];
+      files = [...new Set([...byContent, ...past, ...(dotnet ? programs : []), ...gone, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => oneLine(f) !== f);
     if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);
@@ -1371,7 +1425,7 @@ if (guard(import.meta.url)) {
     const { root, tracked } = project(), config = loadConfig(configPath, root);
     // (after a restore, no base: what git would read it by, the restore could have written)
     const restored = args.includes("--restored"), base = restored ? null : baseOf(root);
-    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored, lock });
+    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored, lock, configPath });
   } catch (e) { fail(e.message); }
   for (const r of result.reports) console.log(`REPORT: ${r}`);
   for (const f of result.failures) console.error(`${advisory ? "WOULD FAIL" : "FAIL"}: ${f}`);
