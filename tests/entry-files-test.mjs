@@ -226,7 +226,12 @@ try {
     fs.rmSync(path.join(un, ".agents")); fs.mkdirSync(path.join(un, "a/b/rules"), { recursive: true });
     fs.writeFileSync(path.join(un, "a/b/rules/core.md"), AG); fs.symlinkSync("a\\b", path.join(un, ".agents"));
     u = runs();
-    ok(!u.out.includes(".agents/rules/core.md stands here but is not read") || u.out.includes("reached through the link `.agents`"), "a link whose text holds a backslash, which Linux and macOS do not follow as a folder's path, is named where the file behind it is not read", u.out);
+    ok(u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `.agents`"), "a link whose text holds a backslash, which Linux and macOS do not follow as a folder's path, is named where the file behind it is not read", u.out);
+    fs.rmSync(path.join(un, ".agents")); fs.mkdirSync(path.join(un, "inner/rules"), { recursive: true });
+    fs.symlinkSync("nowhere.md", path.join(un, "inner/rules/core.md")); fs.symlinkSync("inner", path.join(un, ".agents"));
+    u = runs();
+    ok(u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `inner/rules/core.md`:") && !u.out.includes("`.agents`"),
+      "a link that leads nowhere behind a link to a folder inside the project is named, and the folder's link, which is not why, is not", u.out);
   }
 } finally { fs.rmSync(un, { recursive: true, force: true }); }
 
