@@ -30,7 +30,8 @@ import { projectNotes } from "./manifest-reads.mjs";
 import { saidOf } from "./read-nothing.mjs";
 import { fetchCore, followsOf, hostSaid, inBare, past, releasesIn, untar } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { plain } from "./step-checks.mjs";
+import { copyRefused, outside } from "./copy-runs.mjs";
+import { plain, shown } from "./step-checks.mjs";
 import { notDone, project } from "./steps.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -81,19 +82,20 @@ function copyAgainstPin(root, bare, why, said) {
 }
 
 // The pointers, as pointers.mjs reads them in a project: each that fails, and each it lists as leading nowhere. (The
-// copy's pointers.mjs runs only where this script is that copy's, or the copy was found whole at its pin: one run from
-// a clone never runs a copy that was changed.)
+// copy's pointers.mjs runs only where it lies in the project and was found whole at its pin, or where copy-runs.mjs
+// lets it run: one run from a clone never runs a copy that was changed.)
 function pointers(root, at, whole, said) {
   // (the copy's scripts folder by its real place, which node is then given, so it runs the file judged here and never
-  // reads the links on its way again; one whose real place cannot be read is never this script's)
-  const real = f => { try { return fs.realpathSync.native(f); } catch { return null; } }, scripts = real(path.join(root, at, "scripts"));
-  if (!whole && (scripts === null || real(HERE) !== scripts)) return said.unread("the pointers", `${at} was not found whole at its pin, and this script is not that copy's, so its pointers.mjs was not run`);
-  const r = spawnSync(process.execPath, [path.join(scripts ?? path.join(root, at, "scripts"), "pointers.mjs")], { cwd: root, env: { ...process.env, POINTERS_BASE: "" }, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  // reads the links on its way again)
+  const refused = outside(root, at) ?? (whole ? null : copyRefused(root, at, `run this from the project's copy, \`node ${shown(at)}scripts/attached.mjs\`, or put the copy back whole at its pin: take back each change to it, or delete it and run the sync from a clone of the core (\`node <the clone>/scripts/sync.mjs\`)`));
+  if (refused) return said.unread("the pointers", `${whole ? "" : `${shown(at)} was not found whole at its pin; `}${refused}`);
+  const scripts = fs.realpathSync.native(path.join(root, at, "scripts"));
+  const r = spawnSync(process.execPath, [path.join(scripts, "pointers.mjs")], { cwd: root, env: { ...process.env, POINTERS_BASE: "" }, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   const lines = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").map(l => l.replace(/^::warning::/u, ""));
   const notRun = lines.find(l => l.startsWith("The pointer check did not run:"));
   if (notRun) return said.unread("the pointers", notRun);
   const fails = lines.filter(l => l.startsWith("FAIL: "));
-  if (r.status !== 0 && !fails.length) return said.unread("the pointers", `${at}scripts/pointers.mjs stopped: ${firstLine(r.stderr || r.stdout)}`);
+  if (r.status !== 0 && !fails.length) return said.unread("the pointers", `${shown(`${at}scripts/pointers.mjs`)} stopped: ${firstLine(r.stderr || r.stdout)}`);
   for (const l of fails) said.way("a pointer", l.slice("FAIL: ".length));
   for (const l of lines.filter(l => /^note a broken pointer in an agent tool's file: |^note .*\(read, and not found: /u.test(l)))
     said.way("a pointer", `${l.slice("note ".length).replace(/ \((the pull request's base held it|with no base to read against)[^)]*\)$/u, "")}. Mend: point it at the file, heading or numbered point that holds what it means, or take it out where that is gone`);
@@ -159,18 +161,13 @@ export function sideOf(root, at, bare, { pin, main }, said) {
   return said.way("the sync", `it moves the copy to ${pin.slice(0, 7)}, which is no release of the core, and the project follows the releases. Mend: sync to the newest release, \`node ${at}scripts/sync.mjs\` with no commit named`), null;
 }
 
-// The core at `side`, unpacked into `dir`, its packages those of the copy where the two lock files are the same, else
-// installed by its own install script. (The copy's installed files are the branch's, so what it then finds is a report,
-// never floor rule 8's proof, which pure-sync.mjs gives run from the core's own checkout.)
-function unpack(root, at, bare, side, dir) {
+// The core at `side`, unpacked into `dir`, its packages installed by its own install script from its own lock files,
+// never taken from beside the copy, whose folders a branch can fill; true where that install passed. (What it then
+// finds is a report, never floor rule 8's proof, which pure-sync.mjs gives run from the core's own checkout.)
+function unpack(bare, side, dir) {
   fs.mkdirSync(dir);
   untar(dir, inBare(bare, ["archive", side], { encoding: "buffer", maxBuffer: 1 << 28 }));
-  for (const install of [".packages", ".packages/parser"]) {
-    const lock = f => { try { return fs.readFileSync(path.join(f, install, "package-lock.json"), "utf8"); } catch { return null; } };
-    const mine = path.join(root, at, install, "node_modules");
-    if (lock(dir) !== null && lock(dir) === lock(path.join(root, at)) && fs.existsSync(mine)) fs.symlinkSync(mine, path.join(dir, install, "node_modules"), "junction");
-  }
-  if (!fs.existsSync(path.join(dir, ".packages", "node_modules"))) spawnSync(process.execPath, [path.join(dir, "scripts", "install.mjs"), "all"], { encoding: "utf8", timeout: 600000 });
+  return spawnSync(process.execPath, [path.join(dir, "scripts", "install.mjs"), "all"], { cwd: dir, encoding: "utf8", timeout: 600000 }).status === 0;
 }
 
 // On a sync's branch, pure-sync.mjs from the core's side (sideOf), each line it finds not pure in the way.
@@ -181,7 +178,8 @@ function pureSync(root, at, bare, why, tmp, said) {
   const side = sideOf(root, at, bare, sync, said);
   if (!side) return;
   const dir = path.join(tmp, "side");
-  unpack(root, at, bare, side, dir);
+  // (the installer's own words left out, as the sync leaves them out: a line of them can name a path on this machine)
+  if (!unpack(bare, side, dir)) return said.unread("the sync", `the core's side, ${side.slice(0, 7)}, could not install its packages (its scripts/install.mjs stopped or ran past ten minutes), so pure-sync.mjs was not run from it. Mend: run this again; where it stops again, run that install in a clone of the core at ${side.slice(0, 7)}, \`node <the clone>/scripts/install.mjs all\`, which says why`);
   const r = spawnSync(process.execPath, [path.join(dir, "scripts", "pure-sync.mjs")], { cwd: root, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   if (r.status === 0) return;
   const notPure = String(r.stdout ?? "").split("\n").filter(l => l.startsWith("  NOT PURE ")).map(l => l.slice("  NOT PURE ".length));

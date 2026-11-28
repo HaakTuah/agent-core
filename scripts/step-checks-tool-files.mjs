@@ -2,22 +2,23 @@
 // listed (steps.mjs, beside this file, holds the steps, and step-checks.mjs the words they share). Each piece takes
 // the project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a step names the
 // ones it needs, none runs by itself. It reads only. Node's own modules and git only.
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { leadsOut } from "./guards.mjs";
 import { READ_MOST } from "./own-files.mjs";
-import { FOLDERS, TOOL_FILES, ruleFiles } from "./rule-files.mjs";
+import { FOLDERS, TOOL_FILES, linksIn, ruleFiles } from "./rule-files.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { copiesConfig } from "./check-configs.mjs";
 import { shown } from "./step-checks.mjs";
+import { runCopy } from "./copy-runs.mjs";
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; core-changes/projects.md of the
 // core, "Nothing locks a project": no old breach goes unlisted): each copy there in the copies check's baseline, which
 // `--tools` writes, and each broken pointer there named here, at every sync, until it is gone, as the workflow check's
 // old keys are. Each read from the project's own copy of its check, run with no base, where it notes every one it
-// holds and fails none; null where nothing is left to list.
+// holds and fails none, and only where that copy is the core's code running now (copy-runs.mjs); null where nothing is left to list.
 // Both checks read only the files git tracks, as the work tree holds them (a tracked link, what it leads to), and the
 // copies check its config and baseline besides: where none of the files they read changed since the last reading in
 // this process, that reading's answer stands, so the two runs are made once for each state of the project (a sync reads
@@ -68,19 +69,23 @@ function filesRead(p, config, tracked, git) {
     const parsed = JSON.parse(p.read(config) ?? ""), names = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
     // (each list as copies.mjs lists it, by itself: a ":!" leaves out only what its own list read)
     const ls = specs => (specs.length ? git(["ls-files", "-z", "--", ...specs]).split("\0") : []);
-    const rules = ruleFiles(p.read, dir => tracked.filter(f => (f === dir || f.startsWith(`${dir}/`)) && !leadsOut(p.root, path.join(p.root, f))), { tools: true });
+    // (carrying where a path leads and the links on its way, as the checks' readers do, so that a tool's folder that is a
+    // link is listed where it leads: rule-files.mjs, linksIn)
+    const rules = ruleFiles(Object.assign(f => p.read(f), linksIn(p.root)), dir => tracked.filter(f => (f === dir || f.startsWith(`${dir}/`)) && !leadsOut(p.root, path.join(p.root, f))), { tools: true });
     const tools = tracked.filter(f => TOOL_FILES.includes(f) || FOLDERS.some(dir => f === dir || f.startsWith(`${dir}/`)));
     const named = new Set([config, parsed.baseline, ...rules, ...tools, ...ls(names(parsed.code)), ...ls([...names(parsed.prose), ...(parsed.proseFromSecurity === true ? rules : [])])]);
     return new Set(tracked.filter(f => named.has(f) || f.startsWith(copyAt(p)) || /\.md$/iu.test(f) || /(^|\/)(core-manifest\.md|\.gitattributes|\.gitmodules)$/u.test(f)));
   } catch { return null; }
 }
 
+// (the copy's scripts run only where copy-runs.mjs lets them, each given ten minutes)
 export function toolFilesRead(p, config) {
+  // (each script looked for before either runs, so a copy that lacks one says so, never that the copy is not the core's)
+  for (const script of ["copies.mjs", "pointers.mjs"]) if (!fs.existsSync(path.join(p.root, copyAt(p), "scripts", script))) throw new Unread(`no copy of ${script} to run`);
   const run = (script, args, env) => {
-    const at = path.join(p.root, copyAt(p), "scripts", script);
-    if (!fs.existsSync(at)) throw new Unread(`no copy of ${script} to run`);
-    const r = spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, ...env } });
-    return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
+    const r = runCopy(p.root, copyAt(p), script, args, env);
+    if (r.refused) throw new Unread(r.refused);
+    return r;
   };
   // (a run that never reached its verdict read nothing: reported as not read, never as done)
   const copies = run("copies.mjs", [config], { COPIES_BASE: "" });

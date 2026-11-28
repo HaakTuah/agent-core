@@ -97,6 +97,21 @@ export function foldedLoop(dir, at) {
   return path.join(away, name);
 }
 
+/** The core's scripts `file` loads, it among them, by each `./x.mjs` it imports in turn (`from`, bare or `import()`,
+ *  outside comments): what a test copies into a scratch copy of the core for that script to run there, so that a new
+ *  import needs no list changed. */
+export function loadedBy(file) {
+  const seen = new Set();
+  const walk = f => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    const code = fs.readFileSync(path.join(root, "scripts", f), "utf8").split("\n").filter(l => !/^\s*(\/\/|\/?\*)/u.test(l)).join("\n");
+    for (const m of code.matchAll(/(?:\bfrom|\bimport\s*\(?)\s*"\.\/([\w.-]+\.mjs)"/gu)) walk(m[1]);
+  };
+  walk(file);
+  return [...seen];
+}
+
 /** What the module code `code` prints, run in a process of its own from `cwd`, stopped past `seconds`; null where it
  *  failed or was stopped. For a test of a call that may never end. */
 export function inTime(code, { cwd, seconds = 30 } = {}) {

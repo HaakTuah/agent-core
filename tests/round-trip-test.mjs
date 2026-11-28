@@ -55,7 +55,6 @@ const ELSEWHERE = {
   "checks.mjs": "a job's output (GITHUB_OUTPUT)", "install.mjs": "a job's environment (GITHUB_ENV)", "select.mjs": "a job's output",
   "tests-parts.mjs": "a job's output", "lookup.mjs": "a job's summary", "look.mjs": "a job's output and summary",
   "workflow-run.mjs": "a workflow's run for a test, into its scratch folder", "workflow-install.mjs": "an install set aside for a test's runner",
-  "attached.mjs": "a link to the packages, for a verdict run",
   "code-scan.mjs": "a scan's files in a temporary folder", "hostile.mjs": "files in a temporary folder", "links.mjs": "a temporary folder",
   "workflows.mjs": "a temporary folder", "pure-sync.mjs": "the base it renders, in a temporary folder",
   "core-moved.mjs": "an issue's text, handed to gh", "helper-call.mjs": "a helper's mark, read by nothing of a project's",

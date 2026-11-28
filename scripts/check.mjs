@@ -43,7 +43,7 @@ import { started } from "./started.mjs";
 import { leadsOut } from "./guards.mjs";
 import { installed, notInstalled } from "./packages.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
-import { evaluate, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
+import { evaluate, lookOnlyOnPath, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
 
 // The core's workflows a project calls that only the host can run, each with why: check-test.mjs holds that every
 // workflow the starter kit calls is run here or named here.
@@ -105,8 +105,7 @@ function main() {
   // (on Windows, no program is looked for in the folder a check runs in, which the change under check fills: neither git
   // here nor bash and what it starts in a step, as checks.mjs holds too; every other system looks only on the PATH; #513)
   // (and what this process starts, git and gh, looks only in the PATH's absolute folders)
-  if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
-  for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
+  lookOnlyOnPath();
   const o = options();
   // (a clone of the core installs none itself, as a copy does: #1245, point 6)
   if (!installed("yaml")) { const [what, mend] = notInstalled("yaml").split(". Mend: "); fail(`no workflow can be read here: ${what}.`, mend); }

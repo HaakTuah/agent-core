@@ -18,6 +18,7 @@
 //   node tests/pure-sync-test.mjs
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE, OWNER } from "../scripts/core-address.mjs";
@@ -171,6 +172,29 @@ git(p, "repack", "-adq"); git(tmp, `--git-dir=${origin}`, "repack", "-adq"); // 
 ok(legit.status === 0 && legit.out.includes(`sha=${LEGIT}`), "the sync as the script makes it is pure, and the proof names the head it read", legit.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 ok(legitAttached.status === 0 && /^attached: /u.test(legitAttached.out) && !/^- the (sync|copy): /mu.test(legitAttached.out), "  and whether the core is attached, read on the sync's branch, finds its copy at its pin and the sync pure, run from the core's side", legitAttached.out);
+{
+  // (the core's side installs its own packages, never taking those that stand beside the copy, which a branch can
+  // fill: each package's entry there, as the core's loader finds it, made to leave a mark where the side's pure-sync.mjs
+  // loads it, is loaded by none of it, the lock files the same; a tracked file there stands in the same folder. The
+  // copy's own attached.mjs loads them, as the copy's code does. Only those of .packages/: the side's run here starts
+  // no parser, so a mark planted in the parser's folder could never be left; that folder is closed by the same
+  // unpack, which is given no path of the copy's and installs every folder from the side's own lock files)
+  const mark = path.join(tmp, "copy-package-ran"), kept = new Map();
+  {
+    const modules = path.join(p, "core/.packages"), need = createRequire(path.join(modules, "package.json"));
+    for (const name of Object.keys(JSON.parse(read(modules, "package.json")).dependencies ?? {})) {
+      let at; try { at = need.resolve(name); } catch { continue; }
+      if (!fs.realpathSync(at).startsWith(fs.realpathSync(path.join(modules, "node_modules")) + path.sep)) continue;
+      kept.set(at, fs.readFileSync(at));
+      fs.writeFileSync(at, `if (/[\\\\/]side[\\\\/]scripts[\\\\/]pure-sync\\.mjs$/u.test(process.argv[1] ?? "")) process.getBuiltinModule("node:fs").writeFileSync(${JSON.stringify(mark)}, "ran");\n${kept.get(at)}`);
+    }
+  }
+  const planted = attachedHere();
+  for (const [at, was] of kept) fs.writeFileSync(at, was);
+  const ran = fs.existsSync(mark);
+  fs.rmSync(mark, { force: true });
+  ok(kept.size > 0 && !ran && !/^- the sync: /mu.test(planted.out), "  and the core's side loads none of the packages that stand beside the copy, installing its own from its lock files", `${kept.size} ${ran}\n${planted.out}`);
+}
 
 // the security-review check proves the sync pure itself, as GitHub runs its workflow on the sync's pull request (#99):
 // the default branch's pure-sync.mjs, in a clone of the head that checks nothing out, the token sent to the project's

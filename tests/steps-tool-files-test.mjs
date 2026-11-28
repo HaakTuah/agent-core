@@ -3,11 +3,15 @@
 // the starter kit of this commit writes in a scratch folder. Node's own modules and git.
 //
 //   node tests/steps-tool-files-test.mjs
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { toolFilesRead, toolFilesState } from "../scripts/step-checks-tool-files.mjs";
 import { STEPS, Unread, project } from "../scripts/steps.mjs";
+import { Unwritten, held, writeToolCopies } from "../scripts/step-writers.mjs";
+import { copyRefused } from "../scripts/copy-runs.mjs";
+import { attached } from "../scripts/attached.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 import { kitIn } from "../scripts/steps-kit.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -147,6 +151,16 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
     // (git's own files that change what a check lists)
     const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
     ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
+    // (a tool's folder that is a link inside the project is read where it leads, as the pointer check reads it:
+    // rule-files.mjs, linksIn)
+    if (process.platform !== "win32") {
+      const into = "docs/steer/x.txt", folder = path.join(d, ".agent/rules");
+      put(into, "x\n"); fs.mkdirSync(path.dirname(folder), { recursive: true }); fs.symlinkSync("../docs/steer", folder);
+      stage(into); stage(".agent/rules");
+      const was = state(); put(into, "y\n"); const now = state();
+      unstage(".agent/rules"); unstage(into); fs.rmSync(path.join(d, ".agent"), { recursive: true }); fs.rmSync(path.join(d, "docs/steer"), { recursive: true });
+      ok(was !== now && state() === base, "a change to a file of a tool's folder that is a link inside the project asks a new run", `${was !== now}`);
+    }
     // (where the rule files cannot be read, no file is left out)
     put("SECURITY.md", security.replace(/\*\*the rule files:\*\*/u, "**the files of rules:**"));
     const whole = state(), flow = `.github/workflows/${flows[0]}`;
@@ -156,5 +170,115 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   }
 }
 
+// a copy that is not the core's code running these steps, byte for byte, is never run by them: its reader is not read and
+// its writer writes nothing, while a copy that holds that code still runs (copy-runs.mjs)
+{
+  const step = STEPS.find(s => s.lead === "16 November 2026, the agent tools' files read for copies and pointers"), d = dirs["an-npm-project"];
+  const mark = path.join(tmp, "copy-ran"), said = f => { try { return f() ?? ""; } catch (e) { return e instanceof Unread || e instanceof Unwritten ? e.message : `${e}`; } };
+  const changed = (script, read) => {
+    const at = path.join(d, "core/scripts", script), was = fs.readFileSync(at);
+    fs.writeFileSync(at, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
+    const out = said(read), ran = fs.existsSync(mark);
+    fs.writeFileSync(at, was); fs.rmSync(mark, { force: true });
+    return { out, ran };
+  };
+  const refused = /^core\/'s scripts and packages are not those of the core running these steps \(core\/scripts\/(pointers|copies)\.mjs is changed\), so none of them was run from here\. Mend: run the steps from the project's copy, `node core\/scripts\/steps\.mjs`/u;
+  for (const script of ["pointers.mjs", "copies.mjs"]) {
+    const { out, ran } = changed(script, () => step.check(project(d)));
+    ok(!ran && refused.test(out), `with a changed copy of ${script}, the step runs none of the copy and is not read`, `${ran} ${out}`);
+  }
+  const written = changed("copies.mjs", () => writeToolCopies(project(d), held(d)).join(","));
+  ok(!written.ran && refused.test(written.out), "and the writer of the copies check's baseline runs none of it and writes nothing", `${written.ran} ${written.out}`);
+  // (so too the steps that read the pointer check's names and write the copies check's list of values)
+  const names = STEPS.find(s => s.lead === "26 November 2026, the pointer check reads the names in the descriptions");
+  const values = STEPS.find(s => s.lead === "26 November 2026, the copies check lists the values written twice");
+  const list = path.join(d, "checks/names.json"), kept = fs.existsSync(list) ? fs.readFileSync(list) : null;
+  fs.rmSync(list, { force: true });
+  for (const [what, script, run] of [["the names step's reading", "pointers.mjs", () => names.check(project(d))], ["its writer", "pointers.mjs", () => names.write(project(d), new Set()).join(",")], ["the values step's writer", "copies.mjs", () => values.write(project(d), new Set()).join(",")]]) {
+    const { out, ran } = changed(script, run);
+    ok(!ran && refused.test(out), `and ${what} runs none of a changed copy of ${script}`, `${ran} ${out}`);
+  }
+  ok(!fs.existsSync(list), "nor writes the names' list", "");
+  if (kept) fs.writeFileSync(list, kept);
+  // (nor does attached.mjs, run from here, where the copy was not found whole at its pin: here no core is fetched, so it is
+  // not; its pointers are not read, with its own mend)
+  const pointed = changed("pointers.mjs", () => attached(d, { fetched: path.join(tmp, "no-core") }).unread.join("\n"));
+  ok(!pointed.ran && /^the pointers: core\/ was not found whole at its pin; core\/'s scripts and packages are not those of the core running these steps \(core\/scripts\/pointers\.mjs is changed\), so none of them was run from here\. Mend: run this from the project's copy, `node core\/scripts\/attached\.mjs`/mu.test(pointed.out), "nor attached.mjs, run from here, where the copy was not found whole at its pin", `${pointed.ran} ${pointed.out}`);
+  // (and no other step, nor steps.mjs or attached.mjs, starts Node or loads code but through copy-runs.mjs, or as each
+  // run or load named here, of the core's own files or past copy-runs.mjs's reading, does: by Node's own path, by a bare
+  // `node`, by fork() or a Worker, by import() or createRequire(), or by evaluating text, in the forms the pattern
+  // names. Left to review, since no grep tells it: a form the pattern does not name, a run by a shell's words, and a
+  // load through a helper of another file given a path the copy holds)
+  const scripts = path.join(import.meta.dirname, "..", "scripts");
+  const swept = [...fs.readdirSync(scripts).filter(f => /^step-.*\.mjs$/u.test(f)), ...fs.readdirSync(path.join(scripts, "steps")).map(f => `steps/${f}`), "steps.mjs", "attached.mjs"];
+  const named = {
+    "steps.mjs": ["import(pathToFileURL(path.join(FOLDER, f)).href)", "import(\"./converge.mjs\")"],
+    "attached.mjs": ["spawnSync(process.execPath, [path.join(scripts, \"pointers.mjs\")]", "spawnSync(process.execPath, [path.join(dir, \"scripts\", \"install.mjs\"), \"all\"]", "spawnSync(process.execPath, [path.join(dir, \"scripts\", \"pure-sync.mjs\")]"],
+  };
+  const starts = /\b(execPath|argv0)\b|process\.argv\[0\]|["'`]node(\.exe)?["'`]|\bfork\s*\(|\bWorker\s*\(|\bimport\s*\(|createRequire\s*\(|node:vm|\beval\b|\bFunction\b/u;
+  const unnamed = swept.flatMap(f => fs.readFileSync(path.join(scripts, f), "utf8").split("\n").filter(l => !/^\s*(\/\/|\/?\*)/u.test(l) && starts.test(l))
+    .filter(l => !(named[f] ?? []).some(n => l.includes(n))).map(l => `${f}: ${l.trim().slice(0, 120)}`));
+  const unused = Object.entries(named).flatMap(([f, ns]) => ns.filter(n => !fs.readFileSync(path.join(scripts, f), "utf8").includes(n)).map(n => `${f}: ${n}`));
+  ok(unnamed.length === 0 && unused.length === 0, "no step's file, nor steps.mjs or attached.mjs, starts Node or loads code but through copy-runs.mjs, or as a run named here", [...unnamed, ...unused.map(u => `named and not found: ${u}`)].join("\n"));
+  if (process.platform !== "win32") {
+    const at = path.join(d, "core/scripts/pointers.mjs"), was = fs.readFileSync(at), outside = path.join(tmp, "pointers-outside.mjs");
+    fs.writeFileSync(outside, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
+    fs.rmSync(at); fs.symlinkSync(outside, at);
+    const out = said(() => step.check(project(d))), ran = fs.existsSync(mark);
+    fs.rmSync(at); fs.writeFileSync(at, was); fs.rmSync(mark, { force: true });
+    ok(!ran && /core\/scripts\/pointers\.mjs is changed/u.test(out), "nor one whose script is a link to another file", `${ran} ${out}`);
+  }
+  // (a new file beside the copy's scripts, which a changed script could load, counts as a change too: read past the
+  // step's cache, which keeps an answer read before it and runs nothing)
+  const extra = path.join(d, "core/scripts/extra.mjs");
+  fs.writeFileSync(extra, "export {};\n");
+  const added = said(() => { const p = project(d); return toolFilesRead(p, toolFilesState(p).config); });
+  fs.rmSync(extra);
+  ok(/core\/scripts\/extra\.mjs is not the core's/u.test(added), "nor one that holds a script the core does not", added);
+  // (the steps run from the copy itself run their own code, whatever it holds: the copy's own copy-runs.mjs lets it run)
+  fs.writeFileSync(extra, "export {};\n");
+  const own = (await import(pathToFileURL(path.join(d, "core/scripts/copy-runs.mjs")).href)).copyRefused(d, "core/");
+  fs.rmSync(extra);
+  ok(own === null && /is not the core's/u.test(added), "while the steps run from the copy itself run it, a script beside the core's there", `${own}`);
+  // (a changed lock file of the copy's packages is a change too)
+  const lock = path.join(d, "core/.packages/package-lock.json"), lockWas = fs.readFileSync(lock);
+  fs.writeFileSync(lock, `${lockWas}\n`);
+  const locked = copyRefused(d, "core/");
+  fs.writeFileSync(lock, lockWas);
+  ok(/core\/\.packages\/package-lock\.json is changed/u.test(locked ?? ""), "nor one whose packages' lock file was changed", `${locked}`);
+  // (nor a copy, or its scripts, whose real place lies outside the project, even where it is the running core's own or
+  // the same bytes: one such run would write where the project's files never stand)
+  if (process.platform !== "win32") {
+    const scripts = path.join(d, "core/scripts"), aside = path.join(tmp, "scripts-aside"), copy = path.join(d, "core"), elsewhere = path.join(tmp, "core-elsewhere");
+    fs.renameSync(scripts, aside); fs.symlinkSync(path.join(import.meta.dirname, "..", "scripts"), scripts);
+    const linked = said(() => { const p = project(d); return toolFilesRead(p, toolFilesState(p).config); });
+    fs.rmSync(scripts); fs.renameSync(aside, scripts);
+    ok(/^core\/ or its scripts lie outside the project, so none of them was run from here/u.test(linked), "nor one whose scripts are a link to the running core's own", linked);
+    fs.renameSync(copy, elsewhere); fs.symlinkSync(elsewhere, copy);
+    const away = copyRefused(d, "core/");
+    fs.rmSync(copy); fs.renameSync(elsewhere, copy);
+    ok(/lie outside the project/u.test(away ?? ""), "nor a copy that is a link to the same bytes elsewhere", `${away}`);
+  }
+  ok(step.check(project(d)) === null, "and with the copy put back, the step reads it and has nothing to list", step.check(project(d)) ?? "");
+}
+
+// a program named as git, committed where the guard's own git starts, never runs in its place, though the PATH leads to
+// the folder it starts in and, on Windows, nothing told it not to look there: the guard tells its process so (as
+// check-test.mjs holds of check.mjs; on Windows a stand-in that prints, elsewhere one that leaves a mark)
+{
+  const d = dirs["an-npm-project"], win = process.platform === "win32", mark = path.join(tmp, "planted-git-ran");
+  const planted = path.join(d, "core", win ? "git.exe" : "git");
+  if (win) fs.copyFileSync(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "whoami.exe"), planted);
+  else { fs.writeFileSync(planted, `#!/bin/sh\necho ran > ${JSON.stringify(mark)}\n`); fs.chmodSync(planted, 0o755); }
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== "NoDefaultCurrentDirectoryInExePath"));
+  const key = Object.keys(env).find(k => /^path$/iu.test(k)) ?? "PATH";
+  env[key] = `.${path.delimiter}${path.delimiter}${env[key] ?? ""}`;
+  const guard = pathToFileURL(path.join(import.meta.dirname, "..", "scripts", "copy-runs.mjs")).href;
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", `const { copyRefused } = await import(${JSON.stringify(guard)}); console.log(String(copyRefused(${JSON.stringify(d)}, "core/")));`], { cwd: path.join(d, "core"), env, encoding: "utf8" });
+  fs.rmSync(planted);
+  const ran = fs.existsSync(mark);
+  fs.rmSync(mark, { force: true });
+  ok(!ran && r.stdout.trim() === "null", "a program named git in the folder the guard's git starts in runs in its place for none of it, \".\" and an empty entry on the PATH too", `${ran} ${r.stdout}${r.stderr}`);
+}
 
 done("steps-tool-files");

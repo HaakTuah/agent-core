@@ -16,6 +16,7 @@ import { READ_MOST } from "./own-files.mjs";
 import { parseConfig, where as shapeAt } from "./shape.mjs";
 import { copiesConfig, marksConfig } from "./check-configs.mjs";
 import { atCopy } from "./core-path.mjs";
+import { runCopy } from "./copy-runs.mjs";
 import { MOVED_GLOB, MOVED_GLOBS, moved, namers, partCut, readsOldAlone, sure } from "./step-checks-moved.mjs";
 import { rewritten } from "./step-checks-modules.mjs";
 import { MANIFEST, pinsOnly } from "./sync-pins.mjs";
@@ -65,13 +66,11 @@ export function put(p, f, text) {
   fs.writeFileSync(path.join(p.root, f), text);
 }
 
-// A script of the project's copy run from its root: { status, out, err }; Unwritten where there is no such script.
+// A script of the project's copy run from its root (copy-runs.mjs): { status, out, err }; Unwritten where it cannot run.
 function run(p, script, args, env = {}) {
-  const at = path.join(p.root, copyAt(p), "scripts", script);
-  if (!fs.existsSync(at)) throw new Unwritten(`no copy of ${script} to run`);
-  const r = spawnSync(process.execPath, [at, ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600000, env: { ...process.env, ...env } });
-  if (r.error) throw new Unwritten(`${script} could not run (${plain(r.error.message, p.root)})`);
-  return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}` };
+  const r = runCopy(p.root, copyAt(p), script, args, env);
+  if (r.refused || r.error) throw new Unwritten(r.refused ?? `${script} could not run (${plain(r.error.message, p.root)})`);
+  return r;
 }
 // (a run's own first failure, its mend with it, where it refused before it wrote)
 const refusal = r => plain(r.err.split(/\r?\n/u).find(l => l.startsWith("FAIL")) ?? `it ended with status ${r.status}`);
