@@ -91,6 +91,13 @@ if (process.platform !== "win32") {
   ok(!ran(env, LINKS), "a rule file that is a link out of the project is not read, nor given to lychee");
   fs.rmSync(model);
   fs.writeFileSync(model, held);
+  // (a tool's folder of instructions that is a link inside the project is read where it leads, as the pointer check
+  // reads it: rule-files.mjs, linksIn)
+  fs.mkdirSync(path.join(d, "docs/steer"), { recursive: true }); fs.writeFileSync(path.join(d, "docs/steer/x.md"), "See [the notes](gone.md).\n");
+  fs.mkdirSync(path.join(d, ".agent"), { recursive: true }); fs.symlinkSync("../docs/steer", path.join(d, ".agent/rules"));
+  const steer = ran(env, LINKS);
+  ok(steer && steer.mend.includes("`docs/steer/x.md`:1 to docs/steer/gone.md"), "a link in a file of a tool's folder that is a link is listed where the folder leads", steer?.mend);
+  fs.rmSync(path.join(d, ".agent"), { recursive: true }); fs.rmSync(path.join(d, "docs/steer"), { recursive: true });
 }
 
 done("the steps read by a tool fetched at set-up");

@@ -69,7 +69,7 @@ console.log(JSON.stringify({ error_map: errors })); process.exit(Object.keys(err
 `;
 const carry = core => {
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
-  for (const s of ["pointers.mjs", "names.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs"]) fs.copyFileSync(path.join(here, s), path.join(core, "scripts", s));
+  for (const s of ["pointers.mjs", "names.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "runs-by-itself.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs"]) fs.copyFileSync(path.join(here, s), path.join(core, "scripts", s));
   for (const s of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", s), path.join(core, ".packages", s), { recursive: true });
 };
 const AGENTS = "# A project\n\n## Where things are\n\nIts rules: `SECURITY.md`, and [the developing notes](docs/developing.md#running-it).\n";

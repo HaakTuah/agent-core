@@ -18,7 +18,7 @@ const here = fileURLToPath(new URL("../scripts/", import.meta.url));
 // record of the install and the package itself, from the core's own install, which its tests' job runs)
 const carry = core => {
   fs.mkdirSync(path.join(core, "scripts"), { recursive: true });
-  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "names.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
+  for (const f of ["pointers.mjs", "links.mjs", "markdown.mjs", "packages.mjs", "rule-files.mjs", "runs-by-itself.mjs", "guards.mjs", "core-path.mjs", "core-address.mjs", "started.mjs", "mend.mjs", "names.mjs"]) fs.copyFileSync(path.join(here, f), path.join(core, "scripts", f));
   for (const f of ["package.json", "package-lock.json", ".npmrc", "node_modules/.package-lock.json", "node_modules/marked"]) fs.cpSync(path.join(here, "../.packages", f), path.join(core, ".packages", f), { recursive: true });
 };
 const FILES = {
@@ -212,6 +212,18 @@ try {
     g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a link to a large file there");
     t = check({ POINTERS_BASE: "HEAD" });
     ok(t.status === 0 && /^note the rule file docs\/big\/to-large\.md is no regular file .*the pull request's base held it/m.test(t.out), "a link there to a large file, held by the base as it stands, is noted too, as git reads a link", t.out);
+    // (at a commit, each link of a chain to a tool's file is a tool's file too, its broken pointers keyed by it, as the
+    // work tree's reader lists it; and a file past the bound is read as empty there, as in the work tree)
+    put("docs/chain/end.md", "# End\n\nAs `docs/gone-chain.md` says.\n");
+    fs.symlinkSync("end.md", path.join(tools, "docs/chain/mid.md"));
+    fs.mkdirSync(path.join(tools, ".agent/rules"), { recursive: true }); fs.symlinkSync("../../docs/chain/mid.md", path.join(tools, ".agent/rules/c.md"));
+    put("docs/big/huge.md", `# Huge\n\nAs \`docs/gone-huge.md\` says.\n${"x".repeat((1 << 20) + 10)}\n`);
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a chain of links to a tool's file");
+    const at = spawnSync(process.execPath, [path.join(tools, "core/scripts/pointers.mjs"), "--tools-at", g("rev-parse", "HEAD").trim()], { cwd: tools, encoding: "utf8" });
+    let keys = [];
+    try { keys = JSON.parse(at.stdout).map(k => k.split("\t")[0]); } catch { /* (none read) */ }
+    ok(["docs/chain/mid.md", "docs/chain/end.md", ".agent/rules/c.md"].every(f => keys.includes(f)) && !keys.includes("docs/big/huge.md"),
+      "at a commit, a broken pointer in a tool's file reached through a chain of links is keyed by each link of it, and one in a file past the bound is not read", `${at.stdout}${at.stderr}`);
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails

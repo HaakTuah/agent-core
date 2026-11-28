@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { lycheeReads, readable, run as linksOn } from "./links.mjs";
-import { ruleFiles, toolFiles } from "./rule-files.mjs";
+import { linksIn, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { keysTwice, reads } from "./workflows.mjs";
 import { run as toolsOn } from "./workflow-tools.mjs";
 import { copyAt, readable as yamlRead } from "./workflow-calls.mjs";
@@ -44,7 +44,9 @@ export function workflowFindings(p, env = process.env) {
 // lychee could not run, or the rule files cannot be named, it throws, and the step is reported as not read. A rule file
 // the project's reader would not read (a link out of the project, past its size: own-files.mjs, `safe`) is left out.
 export function linkFindings(p, env = process.env) {
-  const read = f => p.read(f), under = dir => p.files.filter(f => f.startsWith(`${dir}/`));
+  // (links followed as the pointer check's reader follows them, so that a tool's folder that is a link is read where it
+  // leads: rule-files.mjs, linksIn)
+  const read = Object.assign(f => p.read(f), linksIn(p.root)), under = dir => p.files.filter(f => dir === "." || f.startsWith(`${dir}/`));
   const own = ruleFiles(read, under), rules = [...new Set([...own, ...toolFiles(read, under)])];
   const folders = new Set(p.files.flatMap(f => f.split("/").slice(0, -1).map((_, i, s) => `${s.slice(0, i + 1).join("/")}/`)));
   const files = rules.filter(f => p.files.includes(f) && p.safe(f) && lycheeReads(f) && readable(fs.readFileSync(path.join(p.root, f))));
