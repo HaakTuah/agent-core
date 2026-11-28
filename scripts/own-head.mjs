@@ -20,7 +20,7 @@ const gh = args => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore"
 const MEND = "Mend: a sync is opened from a branch of the repository: open its pull request so, and run this on its head";
 const id = repo => (Number.isSafeInteger(repo?.id) && repo.id > 0 ? repo.id : null);
 
-// { own: true }, or { own: false, foreign, why } with the mend, for the commit `sha` of the clone at `cwd`; `ask` is
+// { own: true, repo }, the repository it was read of, or { own: false, foreign, why } with the mend, for the commit `sha` of the clone at `cwd`; `ask` is
 // gh, which a test replaces.
 export function headFrom(sha, cwd, ask = gh) {
   let origin = "";
@@ -33,7 +33,7 @@ export function headFrom(sha, cwd, ask = gh) {
   if (!its.length) return unread(`no open pull request of ${repo} has this head`);
   if (!its.every(whole)) return unread(`GitHub's answer for a pull request of ${repo} with this head lacks its head's or its base's repository`);
   const other = its.find(p => id(p.head.repo) !== id(p.base.repo));
-  if (!other) return { own: true };
+  if (!other) return { own: true, repo };
   const n = Number.isSafeInteger(other.number) ? `, pull request #${other.number}` : "";
   return { own: false, foreign: true, why: `this head comes from a repository other than ${repo}${other.head.repo === null ? ", a fork since deleted" : ""}${n}, so nothing was run. ${MEND}` };
 }

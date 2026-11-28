@@ -276,5 +276,5 @@ function done(from) {
     process.exit(1);
   }
   console.log(`a pure sync: core ${oldPin.slice(0, 7)} -> ${pin.slice(0, 7)}, ${files.length} files, ${pins.size} pins on the core's main`);
-  console.log(`merge it with sha=${head}`);
+  console.log(`merge it with sha=${head}, the head of an open pull request of ${seen.repo} from a branch of it`);
 }

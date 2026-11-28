@@ -34,7 +34,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tmp = scratchDir("pure-sync-test-");
 const slash = p => p.replace(/\\/g, "/");
 const theCore = path.join(tmp, "the-core"), coreRepo = path.join(theCore, ".git"); // (copy-tree.mjs takes the git folder)
-const env = scratchEnv(theCore, tmp);
+// (the test's own programs, git first, are never looked for in the folder they start in, as Windows would by default:
+// a case below plants a program there; what the scripts under test are given leaves this out, so each must say it itself)
+const env = { ...scratchEnv(theCore, tmp), NoDefaultCurrentDirectoryInExePath: "1" };
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
@@ -149,7 +151,7 @@ const aPull = (sha, from = ours) => ({ number: 1, head: { sha, repo: from }, bas
 const opens = (pulls = [aPull(git(p, "rev-parse", "HEAD"))]) => fs.writeFileSync(ghData, JSON.stringify(pulls ? { "pulls\\?state=open": pulls } : {}));
 const pure = (...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
-  opens(Array.isArray(args[0]) || args[0] === null ? args.shift() : undefined);
+  opens(typeof args[0] === "string" ? undefined : args.shift());
   try {
     const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...reviewEnv, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
@@ -187,9 +189,15 @@ for (const [pulls, why, what] of [[null, /could not be read: gh gave no answer f
   [[aPull(LEGIT, { full_name: "someone/project", id: REPO_ID + 1 })], /comes from a repository other than/, "its head's repository bears the project's name but is another"],
   [[aPull(LEGIT, null)], /other than someone\/project, a fork since deleted/, "its head's repository is gone, a fork since deleted"],
   [[aPull(LEGIT, { full_name: "someone/project" })], /lacks its head's or its base's repository/, "the host's answer lacks a field"],
-  [[aPull("0".repeat(40))], /no open pull request of someone\/project has this head/, "no open pull request has its head"]]) {
+  [[aPull("0".repeat(40))], /no open pull request of someone\/project has this head/, "no open pull request has its head"],
+  [[{ ...aPull(LEGIT), base: { sha: base, repo: { full_name: "someone/project" } } }], /lacks its head's or its base's repository/, "its base's repository has no id"],
+  ...[0, -REPO_ID, String(REPO_ID), 2 ** 53].map(n => [[aPull(LEGIT, { full_name: "someone/project", id: n })], /lacks its head's or its base's repository/, `its head's repository's id is ${JSON.stringify(n)}, out of range or no number`]),
+  [[{ ...aPull(LEGIT), head: { sha: 7, repo: ours } }], /lacks a field it always gives/, "a head's commit is no text"],
+  [{ message: "Not a list" }, /lacks a field it always gives/, "a page of the answer is no list"],
+  [[{ ...aPull(LEGIT, { full_name: "../<b>x</b>", id: REPO_ID + 1 }), number: "<b>1</b>" }], /comes from a repository other than someone\/project, so nothing was run/, "its fields hold markup and a path"],
+  [[{ ...aPull(LEGIT), title: "x".repeat(1 << 26) }], /could not be read: gh gave no answer for someone\/project's open pull requests/, "the host's answer is past 64 MB"]]) {
   const r = pure(pulls);
-  ok(r.status === 1 && why.test(r.out) && (r.out.match(/NOT PURE/g) ?? []).length === 1 && !r.out.includes("sha="), `  and where ${what}, nothing is proved, and it stops at once`, r.out);
+  ok(r.status === 1 && why.test(r.out) && (r.out.match(/NOT PURE/g) ?? []).length === 1 && !r.out.includes("sha=") && !/<b>|\.\.\//u.test(r.out), `  and where ${what}, nothing is proved, and it stops at once`, r.out.slice(0, 2000));
 }
 const twoPulls = pure([aPull(LEGIT), aPull(LEGIT, { full_name: "stranger/project", id: REPO_ID + 1 })]);
 ok(twoPulls.status === 1 && /comes from a repository other than/.test(twoPulls.out), "  nor where one of two pull requests with that head comes from another", twoPulls.out);
@@ -198,10 +206,32 @@ ok(twoPulls.status === 1 && /comes from a repository other than/.test(twoPulls.o
 const ran = path.join(tmp, "planted-ran");
 const planted = ["git", "gh"].flatMap(n => [n, `${n}.exe`, `${n}.com`, `${n}.cmd`]).map(n => path.join(p, n));
 for (const f of planted) fs.writeFileSync(f, `#!/bin/sh\necho ran > "${slash(ran)}"\nexit 1\n`, { mode: 0o755 });
-const dotFirst = { ...reviewEnv, [PATHKEY]: `.${path.delimiter}${reviewEnv[PATHKEY]}` };
+const dotFirst = { ...Object.fromEntries(Object.entries(reviewEnv).filter(([k]) => k !== "NoDefaultCurrentDirectoryInExePath")), [PATHKEY]: `.${path.delimiter}${reviewEnv[PATHKEY]}` };
 const withPlanted = (script, args = []) => { git(p, "remote", "set-url", "origin", GH_ORIGIN); opens(); try { const r = spawnSync(process.execPath, [script, ...args], { cwd: p, env: { ...dotFirst, GITHUB_EVENT_PATH: event }, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; } finally { git(p, "remote", "set-url", "origin", origin); } };
 const plantedPure = withPlanted(path.join(theCore, "scripts", "pure-sync.mjs")), plantedAttached = withPlanted("core/scripts/attached.mjs");
 for (const f of planted) fs.rmSync(f);
+{
+  // (nor by the proofs of a queue's lines and of comments alone, run from the core's main in a checkout of a head not
+  // yet proven the repository's own: a git of the head's at its root, "." first on the PATH, leaves its mark for
+  // neither; on Windows Node's own program as git.exe, which a preloaded file makes leave it, elsewhere a script. The
+  // planted program is run once first, so a mark that cannot be left proves nothing)
+  const mark = path.join(tmp, "planted-git-ran"), win = process.platform === "win32", at = path.join(p, win ? "git.exe" : "git");
+  const env = { ...dotFirst };
+  if (win) {
+    const preload = path.join(tmp, "planted-git.cjs");
+    fs.copyFileSync(process.execPath, at);
+    fs.writeFileSync(preload, `if (require("path").basename(process.execPath).toLowerCase() === "git.exe") { require("fs").writeFileSync(${JSON.stringify(mark)}, "ran"); process.exit(1); }\n`);
+    env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --require "${slash(preload)}"`.trim();
+  } else fs.writeFileSync(at, `#!/bin/sh\necho ran > "${slash(mark)}"\nexit 1\n`, { mode: 0o755 });
+  spawnSync(at, ["--version"], { cwd: p, env });
+  const leaves = fs.existsSync(mark);
+  fs.rmSync(mark, { force: true });
+  const runs = [["queue-only.mjs", path.join(tmp, "no-pull.json"), path.join(tmp, "no-files.json")], ["comment-only.mjs"]]
+    .map(([f, ...args]) => spawnSync(process.execPath, [path.join(theCore, "scripts", f), ...args], { cwd: p, env: { ...env, REPO: "someone/project" }, encoding: "utf8" }));
+  const ranHere = fs.existsSync(mark);
+  fs.rmSync(at); fs.rmSync(mark, { force: true });
+  ok(leaves && !ranHere && runs.every(r => !r.error), "  nor by the proofs of a queue's lines or of comments alone, which call the same guard first", `${leaves} ${ranHere}\n${runs.map(r => `${r.stdout}${r.stderr}`).join("\n")}`);
+}
 ok(plantedPure.status === 0 && plantedPure.out.includes(`sha=${LEGIT}`) && plantedAttached.status === 0 && !fs.existsSync(ran),
   "  and a git or gh of the head's own at its root is never run, the folder it starts in left out of the search, \".\" first on the PATH or not", `${plantedPure.out}\n${plantedAttached.out}\n${fs.existsSync(ran)}`);
 const foreignAttached = attachedHere([aPull(LEGIT, null)]), unreadAttached = attachedHere(null);
