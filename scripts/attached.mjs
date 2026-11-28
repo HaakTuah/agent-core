@@ -30,6 +30,7 @@ import { projectNotes } from "./manifest-reads.mjs";
 import { saidOf } from "./read-nothing.mjs";
 import { fetchCore, followsOf, hostSaid, inBare, past, releasesIn, untar } from "./releases.mjs";
 import { started } from "./started.mjs";
+import { copyRefused, outside } from "./copy-runs.mjs";
 import { plain } from "./step-checks.mjs";
 import { notDone, project } from "./steps.mjs";
 
@@ -81,14 +82,15 @@ function copyAgainstPin(root, bare, why, said) {
 }
 
 // The pointers, as pointers.mjs reads them in a project: each that fails, and each it lists as leading nowhere. (The
-// copy's pointers.mjs runs only where this script is that copy's, or the copy was found whole at its pin: one run from
-// a clone never runs a copy that was changed.)
+// copy's pointers.mjs runs only where it lies in the project and was found whole at its pin, or where copy-runs.mjs
+// lets it run: one run from a clone never runs a copy that was changed.)
 function pointers(root, at, whole, said) {
   // (the copy's scripts folder by its real place, which node is then given, so it runs the file judged here and never
-  // reads the links on its way again; one whose real place cannot be read is never this script's)
-  const real = f => { try { return fs.realpathSync.native(f); } catch { return null; } }, scripts = real(path.join(root, at, "scripts"));
-  if (!whole && (scripts === null || real(HERE) !== scripts)) return said.unread("the pointers", `${at} was not found whole at its pin, and this script is not that copy's, so its pointers.mjs was not run`);
-  const r = spawnSync(process.execPath, [path.join(scripts ?? path.join(root, at, "scripts"), "pointers.mjs")], { cwd: root, env: { ...process.env, POINTERS_BASE: "" }, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
+  // reads the links on its way again)
+  const refused = outside(root, at) ?? (whole ? null : copyRefused(root, at));
+  if (refused) return said.unread("the pointers", `${whole ? "" : `${at} was not found whole at its pin; `}${refused}`);
+  const scripts = fs.realpathSync.native(path.join(root, at, "scripts"));
+  const r = spawnSync(process.execPath, [path.join(scripts, "pointers.mjs")], { cwd: root, env: { ...process.env, POINTERS_BASE: "" }, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   const lines = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").map(l => l.replace(/^::warning::/u, ""));
   const notRun = lines.find(l => l.startsWith("The pointer check did not run:"));
   if (notRun) return said.unread("the pointers", notRun);

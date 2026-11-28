@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 import { toolFilesRead, toolFilesState } from "../scripts/step-checks-tool-files.mjs";
 import { STEPS, Unread, project } from "../scripts/steps.mjs";
 import { Unwritten, held, writeToolCopies } from "../scripts/step-writers.mjs";
+import { copyRefused } from "../scripts/copy-runs.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 import { kitIn } from "../scripts/steps-kit.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -162,7 +163,7 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
 // its writer writes nothing, while a copy that holds that code still runs (copy-runs.mjs)
 {
   const step = STEPS.find(s => s.lead === "16 November 2026, the agent tools' files read for copies and pointers"), d = dirs["an-npm-project"];
-  const mark = path.join(tmp, "copy-ran"), said = f => { try { return f() ?? ""; } catch (e) { return e instanceof Unread ? e.message : `${e}`; } };
+  const mark = path.join(tmp, "copy-ran"), said = f => { try { return f() ?? ""; } catch (e) { return e instanceof Unread || e instanceof Unwritten ? e.message : `${e}`; } };
   const changed = (script, read) => {
     const at = path.join(d, "core/scripts", script), was = fs.readFileSync(at);
     fs.writeFileSync(at, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
@@ -175,8 +176,23 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
     const { out, ran } = changed(script, () => step.check(project(d)));
     ok(!ran && refused.test(out), `with a changed copy of ${script}, the step runs none of the copy and is not read`, `${ran} ${out}`);
   }
-  const written = changed("copies.mjs", () => { try { return writeToolCopies(project(d), held(d)).join(","); } catch (e) { return e instanceof Unwritten ? e.message : `${e}`; } });
+  const written = changed("copies.mjs", () => writeToolCopies(project(d), held(d)).join(","));
   ok(!written.ran && refused.test(written.out), "and the writer of the copies check's baseline runs none of it and writes nothing", `${written.ran} ${written.out}`);
+  // (so too the steps that read the pointer check's names and write the copies check's list of values)
+  const names = STEPS.find(s => s.lead === "26 November 2026, the pointer check reads the names in the descriptions");
+  const values = STEPS.find(s => s.lead === "26 November 2026, the copies check lists the values written twice");
+  const list = path.join(d, "checks/names.json"), kept = fs.existsSync(list) ? fs.readFileSync(list) : null;
+  fs.rmSync(list, { force: true });
+  for (const [what, script, run] of [["the names step's reading", "pointers.mjs", () => names.check(project(d))], ["its writer", "pointers.mjs", () => names.write(project(d), new Set()).join(",")], ["the values step's writer", "copies.mjs", () => values.write(project(d), new Set()).join(",")]]) {
+    const { out, ran } = changed(script, run);
+    ok(!ran && refused.test(out), `and ${what} runs none of a changed copy of ${script}`, `${ran} ${out}`);
+  }
+  ok(!fs.existsSync(list), "nor writes the names' list", "");
+  if (kept) fs.writeFileSync(list, kept);
+  // (and no other step runs a script of its own: each goes through copy-runs.mjs)
+  const scripts = path.join(import.meta.dirname, "..", "scripts"), stepFiles = [...fs.readdirSync(scripts).filter(f => /^step-.*\.mjs$/u.test(f)), ...fs.readdirSync(path.join(scripts, "steps")).map(f => `steps/${f}`)];
+  const spawning = stepFiles.filter(f => /process\.execPath/u.test(fs.readFileSync(path.join(scripts, f), "utf8")));
+  ok(spawning.length === 0, "no step's file runs a script of Node's but through copy-runs.mjs", spawning.join(", "));
   if (process.platform !== "win32") {
     const at = path.join(d, "core/scripts/pointers.mjs"), was = fs.readFileSync(at), outside = path.join(tmp, "pointers-outside.mjs");
     fs.writeFileSync(outside, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
@@ -197,6 +213,25 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   const own = (await import(pathToFileURL(path.join(d, "core/scripts/copy-runs.mjs")).href)).copyRefused(d, "core/");
   fs.rmSync(extra);
   ok(own === null && /is not the core's/u.test(added), "while the steps run from the copy itself run it, a script beside the core's there", `${own}`);
+  // (a changed lock file of the copy's packages is a change too)
+  const lock = path.join(d, "core/.packages/package-lock.json"), lockWas = fs.readFileSync(lock);
+  fs.writeFileSync(lock, `${lockWas}\n`);
+  const locked = copyRefused(d, "core/");
+  fs.writeFileSync(lock, lockWas);
+  ok(/core\/\.packages\/package-lock\.json is changed/u.test(locked ?? ""), "nor one whose packages' lock file was changed", `${locked}`);
+  // (nor a copy, or its scripts, whose real place lies outside the project, even where it is the running core's own or
+  // the same bytes: one such run would write where the project's files never stand)
+  if (process.platform !== "win32") {
+    const scripts = path.join(d, "core/scripts"), aside = path.join(tmp, "scripts-aside"), copy = path.join(d, "core"), elsewhere = path.join(tmp, "core-elsewhere");
+    fs.renameSync(scripts, aside); fs.symlinkSync(path.join(import.meta.dirname, "..", "scripts"), scripts);
+    const linked = said(() => { const p = project(d); return toolFilesRead(p, toolFilesState(p).config); });
+    fs.rmSync(scripts); fs.renameSync(aside, scripts);
+    ok(/^core\/ or its scripts lie outside the project, so none of them was run from here/u.test(linked), "nor one whose scripts are a link to the running core's own", linked);
+    fs.renameSync(copy, elsewhere); fs.symlinkSync(elsewhere, copy);
+    const away = copyRefused(d, "core/");
+    fs.rmSync(copy); fs.renameSync(elsewhere, copy);
+    ok(/lie outside the project/u.test(away ?? ""), "nor a copy that is a link to the same bytes elsewhere", `${away}`);
+  }
   ok(step.check(project(d)) === null, "and with the copy put back, the step reads it and has nothing to list", step.check(project(d)) ?? "");
 }
 

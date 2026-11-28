@@ -1,12 +1,10 @@
 // The step of setup/sync-notes/827-the-copies-check-lists-the-values-written-twice.md, which steps.mjs, beside this
 // folder, loads with the rest in the order of their names.
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
 import { copiesConfig } from "../check-configs.mjs";
 import { listForm } from "../copies-values.mjs";
 import { READ_MOST } from "../own-files.mjs";
 import { COST, shown } from "../step-checks.mjs";
+import { runCopy } from "../copy-runs.mjs";
 import { Unwritten, writable } from "../step-writers.mjs";
 import { Unread, copyAt } from "../workflow-calls.mjs";
 
@@ -35,9 +33,9 @@ export default { lead: "26 November 2026, the copies check lists the values writ
   write: (p, busy) => {
     const { config, baseline } = baselineOf(p);
     writable(p, baseline, busy);
-    const at = path.join(p.root, copyAt(p), "scripts", "copies.mjs");
-    if (!fs.existsSync(at)) throw new Unwritten("no copy of copies.mjs to run");
-    const r = spawnSync(process.execPath, [at, config, "--first"], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, env: { ...process.env, COPIES_BASE: "" } });
-    if (r.error || r.status !== 0) throw new Unwritten(`copies.mjs wrote no list: ${shown((r.stderr || "").split(/\r?\n/u).find(l => l.startsWith("FAIL")) ?? `it ended with status ${r.status}`)}`);
+    // (only where copy-runs.mjs lets the copy run)
+    const r = runCopy(p.root, copyAt(p), "copies.mjs", [config, "--first"], { COPIES_BASE: "" });
+    if (r.refused) throw new Unwritten(r.refused);
+    if (r.error || r.status !== 0) throw new Unwritten(`copies.mjs wrote no list: ${shown((r.err || "").split(/\r?\n/u).find(l => l.startsWith("FAIL")) ?? `it ended with status ${r.status}`)}`);
     return [baseline];
   } };

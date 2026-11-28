@@ -78,6 +78,7 @@ function filesRead(p, config, tracked, git) {
 
 // (the copy's scripts run only where copy-runs.mjs lets them, each given ten minutes)
 export function toolFilesRead(p, config) {
+  // (each script looked for before either runs, so a copy that lacks one says so, never that the copy is not the core's)
   for (const script of ["copies.mjs", "pointers.mjs"]) if (!fs.existsSync(path.join(p.root, copyAt(p), "scripts", script))) throw new Unread(`no copy of ${script} to run`);
   const run = (script, args, env) => {
     const r = runCopy(p.root, copyAt(p), script, args, env);
