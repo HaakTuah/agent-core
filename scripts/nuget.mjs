@@ -22,7 +22,9 @@
 //     items), an SDK taken from a package (a project's or an Import's named with a version, an Sdk element with one, a
 //     global.json's "msbuild-sdks"), an Import or such a property it cannot follow, or a document type. Each fails but
 //     where the base held it in the same file (by its lines, counted, as an audit's "fetches"), or the config's
-//     "nuget.unread" declares it word for word, as the failure prints it; a line declared that no form matches fails;
+//     "nuget.unread" declares it word for word, as the failure prints it; a line declared that no form matches fails.
+//     The declaration is read from the config as the pull request holds it, as an audit entry's "fetches" is read from
+//     the audit it holds: one a pull request adds stands in its diff, in a protected file, for the reviews to read;
 //   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,

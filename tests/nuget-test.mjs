@@ -780,6 +780,18 @@ if (process.platform !== "win32") {
   ok(after.status === 0 && after.lines.length > 0 && after.named.length === 0 && before.status === 0 && before.named.length > 0,
     "after a restore (--restored), no git command the check runs names a parent of the merge; without it, the base is read", JSON.stringify({ after: after.named, before: before.named, out: after.out }));
 }
+if (process.platform !== "win32") {
+  // (the script whole, on a merge as a pull request's checkout holds it, its base the merge's first parent: a target the
+  // base held passes, reported, where the pull request changes another file, as on a sync or a project's daily try;
+  // one the pull request adds fails)
+  const CS = "src/App/App.csproj", gen = `<Target Name="Gen" BeforeTargets="Build"><Exec Command="echo" /></Target>`;
+  inRepo(CS, `<Project Sdk="Microsoft.NET.Sdk">${gen}</Project>`); git("add", "-A"); git("commit", "-q", "-m", "a target at the base");
+  const merged = (name, write) => { git("switch", "-q", "-c", name); write(); git("add", "-A"); git("commit", "-q", "-m", name); git("switch", "-q", "main"); git("merge", "-q", "--no-ff", "-m", `merge ${name}`, name); return run("checks/licences.json", "--packages", json); };
+  const held = merged("other-file", () => inRepo("README.md", "another change\n"));
+  ok(held.status === 0 && held.out.includes(`REPORT: ${CS} holds what the read before the restore does not follow`) && held.out.includes("held before this check read it"), "on a merge, a target the base held, beside a change to another file, passes reported", held.out);
+  const added = merged("new-target", () => inRepo(CS, `<Project Sdk="Microsoft.NET.Sdk">${gen}<Target Name="More" AfterTargets="Build" /></Project>`));
+  ok(added.status === 1 && added.out.includes('<Target Name="More" AfterTargets="Build" />. Mend: '), "and a target the pull request adds beside it fails, saying its mend", added.out);
+}
 ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);
 process.exit(failed ? 1 : 0);
