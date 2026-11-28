@@ -15,7 +15,7 @@ import path from "node:path";
 import { copyOf } from "./core-path.mjs";
 import { inProject, leadsOut, oneLine, parseBounded } from "./guards.mjs";
 import { counts, holderOf } from "./holder-form.mjs";
-import { FLOOR, ruleFiles, toolFiles } from "./rule-files.mjs";
+import { FLOOR, linksIn, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { rulesOf } from "./rules.mjs";
 
 export const OWN = "checks/holders.json";
@@ -31,10 +31,12 @@ const ABOUT_FORMS = '"this project", "its kind: <the kind>" or "every project"';
 // The project's own rule files under `root`: [{ file, start }], `start` where a session reads it at its start (its
 // AGENTS.md and CLAUDE.md, and the files they pull in by an "@" line); and `read`, a file's text or null.
 function ownRuleFiles(root) {
-  const read = f => { try { const at = path.join(root, f); return inProject(f) && !leadsOut(root, at) && fs.statSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } };
+  // (carrying where a path leads and the links on its way, as the checks' readers do, so that a tool's folder that is a
+  // link is listed where it leads: rule-files.mjs, linksIn)
+  const read = Object.assign(f => { try { const at = path.join(root, f); return inProject(f) && !leadsOut(root, at) && fs.statSync(at).isFile() ? fs.readFileSync(at, "utf8") : null; } catch { return null; } }, linksIn(root));
   // (the core's copy where the manifest places it, core/ by default: its rules are the core's, never the project's)
   const copy = copyOf(root), mine = f => !`${path.posix.normalize(f)}/`.startsWith(copy) && read(f) !== null;
-  const list = dir => { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--", dir], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
+  const list = dir => { try { return execFileSync("git", ["-C", root, "ls-files", "-z", "--", `:(literal)${dir}`], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0").filter(Boolean); } catch { return []; } };
   const pulled = ["AGENTS.md", "CLAUDE.md"].flatMap(f => [...(read(f) ?? "").matchAll(/^@(\S+\.md)[ \t]*\r?$/gmu)].map(m => path.posix.normalize(m[1])));
   let listed;
   try { listed = ruleFiles(read, list, { tools: true }); } catch { listed = [...FLOOR, ...toolFiles(read, list)]; }

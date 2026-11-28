@@ -10,10 +10,10 @@
 // under a folder: by default the work tree's, each a file of the project's own that no link leads out of (guards.mjs),
 // and a check passes a `read` and a `list` that read a commit's tree, to hold the base's list. A reader may carry
 // `where`, the path a path leads to, its links followed (followLinks), so that a tool's folder that is a link is
-// listed where it leads: readHere and readAt's readers carry it.
-// Not hardened here, each needing links the project already holds on its default branch: a link on the way to a tool's
-// folder or file, or between the links of a chain, is not itself listed, so a pull request that only points it
-// elsewhere in the project changes no listed file.
+// listed where it leads, and `links`, each link on a path's way, so that a link on the way to a tool's or a floor file,
+// or between the links of a chain, is listed with it, and one on the way to a tool's folder is named (wayLinks):
+// readHere, linksIn's and readAt's readers carry both. A tool's folder that a submodule holds, which no check here can
+// read, entry-files.mjs fails.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -30,8 +30,13 @@ const tracked = dir => { try { return execFileSync("git", ["ls-files", "-z", "--
 export const isLinkHere = p => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
 export const linkTextHere = p => { try { return fs.readlinkSync(p); } catch { return null; } };
 export const isFolderHere = p => { try { return fs.lstatSync(p).isDirectory(); } catch { return false; } };
-export const readHere = Object.assign(f => { try { return inside(f) && fs.statSync(f).isFile() ? fs.readFileSync(f, "utf8") : null; } catch { return null; } },
-  { where: f => followLinks(f, isLinkHere, linkTextHere, isFolderHere) });
+// Where a path of the work tree under `root` leads and the links on its way, as followLinks reads them, for a reader
+// of a project's files that is not run from its root: { where, links }, as readHere carries them.
+export const linksIn = (root = ".") => {
+  const at = p => (root === "." ? p : path.join(root, p)), walk = (f, passed) => followLinks(f, p => isLinkHere(at(p)), p => linkTextHere(at(p)), p => isFolderHere(at(p)), passed);
+  return { where: f => walk(f), links: f => { const passed = []; walk(f, passed); return passed; } };
+};
+export const readHere = Object.assign(f => { try { return inside(f) && fs.statSync(f).isFile() ? fs.readFileSync(f, "utf8") : null; } catch { return null; } }, linksIn("."));
 export const FLOOR = Object.freeze(["AGENTS.md", "CLAUDE.md", "SECURITY.md", "core-manifest.md"]);
 export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FILES)]);
 // A reader of the files of a commit's tree, as the work tree's reader reads them, for a check that holds a pull request
@@ -40,7 +45,7 @@ export const TOOL_FILES = Object.freeze(["GEMINI.md", ...Object.values(ENTRY_FIL
 // from the project's root. `place`, where given, is placeAt(commit)'s, so that the tree is listed once; `bound`, where
 // given, the most bytes a file it reads may hold, a larger one read as none.
 export function readAt(commit, place = placeAt(commit), { bound } = {}) {
-  return Object.assign(f => { const at = place(f); return at === null || (bound !== undefined && !(place.size(at) <= bound)) ? null : place.show(at); }, { where: place.follow });
+  return Object.assign(f => { const at = place(f); return at === null || (bound !== undefined && !(place.size(at) <= bound)) ? null : place.show(at); }, { where: place.follow, links: place.links });
 }
 // (a link's text that leads out of any tree: none read, or one written from a root)
 const outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
@@ -48,11 +53,12 @@ const outward = to => to === null || /^([\\/]|[A-Za-z]:)/u.test(to);
 // link has its text (`text`, null where none is read) put in its place, read from the link's own folder, a `..` steps
 // back from the folder reached, and a part with more after it must be a folder (`isFolder`), while it leads inside the
 // tree, at most 40 links; the path it ends at, or null where a link leads out, the links run past 40 or a part with
-// more after it is no folder. placeAt reads a commit's tree through it and readHere and entry-files.mjs the work tree,
+// more after it is no folder; `passed`, where given, has each link it meets pushed to it, by its path from the root.
+// placeAt reads a commit's tree through it and readHere and entry-files.mjs the work tree,
 // so the two read a link alike there. Windows reads a `..` in a link's text by its spelling, so there the work tree
 // may read another file than this walk names: the reader's own check (ownText's, guards.mjs's leadsOut) still keeps
 // what is read inside the project, and the checks that gate a merge run on Linux.
-export function followLinks(f, isLink, text, isFolder) {
+export function followLinks(f, isLink, text, isFolder, passed = null) {
   if (String(f).startsWith("/")) return null;
   let todo = String(f).split("/");
   const cur = [];
@@ -63,19 +69,32 @@ export function followLinks(f, isLink, text, isFolder) {
     if (p === "..") { if (!cur.length) return null; cur.pop(); continue; }
     const next = [...cur, p].join("/");
     if (!isLink(next)) { cur.push(p); continue; }
+    passed?.push(next);
     const to = ++hops > 40 ? null : text(next);
     if (outward(to)) return null;
     todo = to.replace(/\\/gu, "/").split("/").concat(todo);
   }
   return cur.join("/");
 }
+// Whether a submodule (`gitlinks`, their paths) holds what a path names, read as followLinks reads it, a submodule and
+// the folders above it read as folders: the path as written, a link its walk passes, or where it ends lies in one, or one lies under where it
+// ends; behind a submodule no check here can see what a tool reads.
+export function inSubmodule(f, isLink, text, isFolder, gitlinks) {
+  const subs = new Set(gitlinks), under = p => p.split("/").some((_, i, a) => subs.has(a.slice(0, i + 1).join("/"))), passed = [];
+  if (!subs.size) return false;
+  // (a submodule, and each folder above one, read as a folder though no checkout holds it)
+  const at = followLinks(f, isLink, text, p => subs.has(p) || [...subs].some(g => g.startsWith(`${p}/`)) || isFolder(p), passed);
+  return under(path.posix.normalize(f)) || passed.some(under) || (at !== null && (at === "" || under(at) || [...subs].some(g => g.startsWith(`${at}/`))));
+}
 // Where readAt(commit) reads a path from: the path, from the root, of the file it leads to, every link on its way
 // followed as readAt follows it, or null where readAt reads nothing there; `follow` gives where any path leads, a
-// folder too (followLinks); `show` reads a file of the tree by its path, `size` gives its bytes, and `held` says
+// folder too (followLinks), and `links` the links on a path's way; `gitlinks` the submodules the tree holds, by their
+// paths, and `submodule` whether one holds what a path names (inSubmodule); `show` reads a file of the tree by its path, `size` gives its bytes, and `held` says
 // whether the tree holds anything at a path: a link on its way it cannot follow,
 // one that leads to nothing in the tree, and what it does not read (a folder, a submodule) included.
-export function placeAt(commit) {
-  const run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
+// `run`, where given, runs git with its arguments and gives what it prints, throwing where it fails: for a tree another
+// repository than the one it is run from holds.
+export function placeAt(commit, run = args => execFileSync("git", args, { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] })) {
   let modes = null;
   const sizes = new Map();
   const mode = f => {
@@ -94,7 +113,10 @@ export function placeAt(commit) {
   };
   // (a link's text, read only where it is at most 4096 bytes, as a system's paths are; a longer one is none)
   const linkText = at => (size(at) <= 4096 ? show(at) : null);
-  const follow = f => followLinks(f, p => mode(p) === "120000", linkText, isFolder);
+  const follow = (f, passed) => followLinks(f, p => mode(p) === "120000", linkText, isFolder, passed);
+  const links = f => { const passed = []; follow(f, passed); return passed; };
+  const gitlinks = () => { mode(""); return [...modes].filter(([, m]) => m === "160000").map(([k]) => k); };
+  const submodule = f => inSubmodule(f, p => mode(p) === "120000", linkText, isFolder, gitlinks());
   const place = f => { const at = follow(f); return at !== null && /^100/u.test(mode(at) ?? "") ? at : null; };
   // (whether the tree holds anything at a path, read part by part as followLinks reads a path: each link's text put in its
   // place and read from the link's own folder; a part a link's text brings that the tree lacks makes it a link that
@@ -119,35 +141,40 @@ export function placeAt(commit) {
     }
     return true;
   };
-  return Object.assign(place, { follow, show, size, held });
+  return Object.assign(place, { follow: f => follow(f), links, gitlinks, submodule, show, size, held });
 }
 // The files an agent tool takes its instructions from, as `read` and `list` find them: those of TOOL_FILES, then those
 // git tracks under FOLDERS, each that `read` reads (so a link that leads out of the project is none, at a commit too).
 // Where `read` carries `where`, each folder is listed where its links lead (none where one leads out), and a file
-// there that is a link, and an entry file that is one, is listed with the file it leads to, so that a change to either
-// is a change to a tool's file;
+// there that is a link, and an entry file that is one, is listed with the file it leads to and each link of the chain
+// between (`links`, those that read as a file), so that a change to any is a change to a tool's file;
 // a folder that leads to the project's root holds every file the tree holds, its lister asked for "."; a folder in a
-// submodule is listed as none, since no check here can read it, while an entry file there is listed where `read` reads it.
-// `list` is given a path to read literally, never as a pattern.
+// submodule is listed as none, since no check here can read it (entry-files.mjs fails it), while an entry file there
+// is listed where `read` reads it. `list` is given a path to read literally, never as a pattern.
+const chained = read => f => [f, ...(read.links ?? (() => []))(f), (read.where ?? (g => g))(f)];
 export const toolFiles = (read = readHere, list = tracked) => {
-  const where = read.where ?? (f => f);
   const listed = toolFolders(read).flatMap(at => list(at === "" ? "." : at).filter(f => at === "" || f === at || f.startsWith(`${at}/`)));
-  return [...new Set(TOOL_FILES.concat(listed).flatMap(f => [f, where(f)]))].filter(f => f && read(f) !== null);
+  return [...new Set(TOOL_FILES.concat(listed).flatMap(chained(read)))].filter(f => f && read(f) !== null);
 };
+// Each link on the way to a tool's folder or file, or to a floor file, as `read` names them (none where it carries no
+// `links`), those that lead to a folder among them, which no list of files holds: a pull request that points one
+// elsewhere changes what a tool reads.
+export const wayLinks = (read = readHere) => [...new Set([...FOLDERS, ...TOOL_FILES, ...FLOOR].flatMap(f => (read.links ?? (() => []))(f)))];
 // The folders of FOLDERS where `read` says they lead ("" the project's root), each where none leads out; and whether a
 // path lies in one of them, so that a file a pull request adds there is a tool's file before any list holds it.
 export const toolFolders = (read = readHere) => [...new Set(FOLDERS.map(read.where ?? (f => f)).filter(at => at !== null))];
 export const inToolFolder = (name, folders) => folders.some(at => at === "" || name === at || String(name).startsWith(`${at}/`));
 // A rule file or protected folder by its name alone (floor rule 3): what a tool takes its instructions from, wherever
 // it lies, the threat model, the manifest, the copy of the core, and the folders of what runs by itself.
-export const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?)\//iu;
+export const RULES = /(?:^|\/)(?:AGENTS|CLAUDE|SECURITY|GEMINI|REVIEW)(?:\.[\w-]+)?\.md$|threat-model|^core-manifest\.md$|^core\/|(?:^|\/)\.(?:github|claude|agents?|kiro|codex|gemini|cursor|windsurf|amazonq|continue|roo)\//iu;
 
 export function ruleFiles(read = readHere, list = tracked, { tools = false } = {}) {
   const security = read("SECURITY.md");
   if (security === null) throw new Error('the project has no SECURITY.md yet, where the checks read its rule files. Mend: write it from the starter kit\'s template (core/setup/template/SECURITY.md.tmpl), its rule 3 with the line "**the rule files:** ...;"');
   const rule = /\*\*the rule files:\*\*([^;]*);/.exec(security);
   if (!rule) throw new Error('SECURITY.md, rule 3, has no "the rule files:" line, where the checks read the project\'s own. Mend: add to rule 3 the line "**the rule files:** `<each file>`, ...;" as the starter kit\'s template (core/setup/template/SECURITY.md.tmpl) writes it');
-  // (with the tools' files, a floor file that is a link is listed with the file it leads to too, as a tool's file is)
-  const own = tools ? toolFiles(read, list).concat(FLOOR.map(f => (read.where ?? (g => g))(f))).filter(f => f && read(f) !== null) : [];
+  // (with the tools' files, a floor file that is a link is listed with the file it leads to and the links between, as a
+  // tool's file is)
+  const own = tools ? toolFiles(read, list).concat(FLOOR.flatMap(chained(read))).filter(f => f && read(f) !== null) : [];
   return [...new Set(FLOOR.filter(f => read(f) !== null).concat(own, [...rule[1].matchAll(/`([^`]+)`/g)].map(m => m[1])))];
 }

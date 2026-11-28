@@ -13,7 +13,7 @@ import { moved } from "./step-checks-moved.mjs";
 import { hookCommands, readCore } from "./core-path.mjs";
 import { READ, TEMPLATES, files, licences, sizes } from "./init.mjs";
 import { READERS } from "./shape-readers.mjs";
-import { ruleFiles } from "./rule-files.mjs";
+import { linksIn, ruleFiles } from "./rule-files.mjs";
 import { hostSays, root } from "./scratch-core.mjs";
 import { parseBounded } from "./guards.mjs";
 
@@ -157,7 +157,8 @@ export const NPX = ["np", "x"].join(""), CURL = ["cu", "rl"].join("");
 // does (#1094).
 export function ruleTexts(dir) {
   const p = project(dir);
-  return Object.fromEntries(ruleFiles(p.read, d => p.files.filter(f => f.startsWith(`${d}/`)), { tools: true }).map(f => [f, p.read(f)]));
+  const read = Object.assign(f => p.read(f), linksIn(dir));
+  return Object.fromEntries(ruleFiles(read, d => p.files.filter(f => d === "." || f.startsWith(`${d}/`)), { tools: true }).map(f => [f, p.read(f)]));
 }
 export const wordsKept = (before, after) => {
   // (the module lines read past in the manifest alone, where the writers write them)

@@ -16,9 +16,9 @@
 // scripts/clean-merges.mjs proved, only through merges whose tree is the one git makes of their parents (#323), the
 // status naming the one where that stops it. None is needed where every changed file
 // is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
-// CLAUDE.local.md too, the copy under core/ or the path the default branch's manifest names, .github/, .claude/, .agents/
-// and .agent/, and those the project's
-// SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
+// CLAUDE.local.md too, the copy under core/ or the path the default branch's manifest names, .github/, .claude/ and
+// each agent tool's own folder (.agents/, .agent/, .kiro/, .codex/ and the like: rule-files.mjs, RULES), each link on
+// the way to a tool's or floor file or folder, and those the project's SECURITY.md adds; never in the core's own repository, where every file is protected), nor where the pull request has
 // a sync's shape: the copy at that path, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
 // sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's), nor where
 // the caller proved it queue-only with the default branch's queue-only.mjs (QUEUE, its files one Markdown file: floor
@@ -54,7 +54,7 @@ import { CORE } from "./core-address.mjs";
 import { copyHeld } from "./core-path.mjs";
 import { blockingOf, codexFind } from "./review-comments.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
-import { RULES, inToolFolder, ruleFiles, toolFolders } from "./rule-files.mjs";
+import { RULES, inToolFolder, ruleFiles, toolFolders, wayLinks } from "./rule-files.mjs";
 import { RUNNING, UNREAD, WRITERS, asPosted, boundOf, codexState, counted, pinsAlone, queueOnly, reviewersOf, standsFrom, status, unproved, whole, writersOf } from "./security-review.mjs";
 import { guard } from "./mend.mjs";
 
@@ -209,7 +209,9 @@ if (guard(import.meta.url)) {
   };
   // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
   let rules = [];
+  // (and each link on the way to a tool's folder or file or a floor file, which a pull request may point elsewhere)
   try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
+  try { rules = rules.concat(wayLinks()); } catch { /* (none read) */ }
   // (and the core's copy, at the path the default branch's manifest names, checked out here, none in the core's own
   // repository: core-path.mjs)
   const copy = copyHeld(".");
