@@ -116,7 +116,8 @@ export function lacking(read) {
 // behind a link it does not follow, may have lacked anything, so what the head lacks there is a note too.
 export function verdict(head, base = null) {
   const was = new Set((base ? lacking(base) : []).flatMap(l => [...l.missing.map(p => `${l.file}\0${p}`), ...(l.off ? [`${l.file}\0off`] : [])]));
-  const unread = f => Boolean(base?.held?.(f)) && base(f) === null, old = (file, key) => was.has(`${file}\0${key}`) || unread(AGENTS) || unread(file);
+  // (each file's reading at the base made once, however many imports the head lacks: each is a call to git)
+  const seen = new Map(), unread = f => { if (!seen.has(f)) seen.set(f, Boolean(base?.held?.(f)) && base(f) === null); return seen.get(f); }, old = (file, key) => was.has(`${file}\0${key}`) || unread(AGENTS) || unread(file);
   const fails = [], notes = [];
   for (const l of lacking(head)) {
     if (!l.off) continue;

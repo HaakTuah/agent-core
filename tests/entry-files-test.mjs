@@ -58,6 +58,11 @@ const base = reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:co
 let v = verdict(head, base);
 ok(v.fails.length === 1 && v.fails[0].includes("core/roles/shared/git.md") && v.notes.length === 1 && v.notes[0].includes("core/floor/security.md"),
   "against a base, only what the pull request leaves out fails; what the base already lacked is noted (nothing locks a project)");
+const reads = new Map(), counted = Object.assign(f => { reads.set(f, (reads.get(f) ?? 0) + 1); return base(f); }, { held: () => true });
+const many = Array.from({ length: 50 }, (_, i) => `@core/roles/shared/x${i}.md\n`).join("");
+v = verdict(reader({ "AGENTS.md": `${AGENTS}${many}`, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" }), counted);
+ok(v.fails.length === 50 && v.fails[49].includes("x49.md") && Math.max(...reads.values()) <= 2,
+  "against a base it held, each file there is read at most twice however many imports the head lacks, since each read is a call to git", JSON.stringify([...reads]));
 v = verdict(head);
 ok(v.fails.length === 2 && v.notes.length === 0, "with no base, as in the core's own repository, everything fails");
 ok(v.fails.every(f => f.includes("Mend: add the line #[[file:")), "each failure names the line to add, in the tool's own form");
