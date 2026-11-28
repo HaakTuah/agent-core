@@ -388,6 +388,8 @@ function declaredEncoding(text) {
  * read either }. A build file git knows is read as one,
  * whoever imports it. Each file is read once, and each place an Import leads to looked up once from each file.
  */
+// (with no mark, as a reader of XML finds the encoding by its first "<" and the NULs beside it: UTF-32's before UTF-16's)
+const NO_MARK = [[[0x3c, 0, 0, 0], "utf-32le"], [[0, 0, 0, 0x3c], "utf-32be"], [[0x3c, 0], "utf-16le"], [[0, 0x3c], "utf-16be"]];
 // (a file's text by its byte-order mark, as .NET's StreamReader reads one, bytes UTF-8 does not allow as U+FFFD: only to
 // know what the file is, never to read what it names)
 function markedText(b) {
@@ -397,12 +399,8 @@ function markedText(b) {
   if (b[0] === 0 && b[1] === 0 && b[2] === 0xfe && b[3] === 0xff) return utf32(b.subarray(4), false);
   if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b.subarray(2));
   if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b.subarray(2));
-  // (with no mark, as a reader of XML finds the encoding by its first "<" and the NULs beside it)
-  if (b[0] === 0x3c && b[1] === 0 && b[2] === 0 && b[3] === 0) return utf32(b, true);
-  if (b[0] === 0 && b[1] === 0 && b[2] === 0 && b[3] === 0x3c) return utf32(b, false);
-  if (b[0] === 0x3c && b[1] === 0) return new TextDecoder("utf-16le").decode(b);
-  if (b[0] === 0 && b[1] === 0x3c) return new TextDecoder("utf-16be").decode(b);
-  return new TextDecoder("utf-8").decode(b);
+  const wide = NO_MARK.find(([start]) => start.every((x, k) => b[k] === x));
+  return wide ? (wide[1] === "utf-32le" || wide[1] === "utf-32be" ? utf32(b, wide[1] === "utf-32le") : new TextDecoder(wide[1]).decode(b)) : new TextDecoder("utf-8").decode(b);
 }
 /** Whether a file's text is an MSBuild project, its root element a Project, past blanks, byte-order marks, comments,
  *  processing instructions and a document type, in one pass. */
@@ -596,9 +594,13 @@ export function nugetConfig(config, copy = "core/") {
   if (!Array.isArray(sources) || !sources.every(source)) throw new Error('the config\'s "nuget.sources" is not a list of sources: each an https address of a named host, with no sign-in or question in it, or a folder of the project\'s own, as git lists it, ending in "/". Mend: write each so, or take it out');
   const same = sources.map((s) => s.toLowerCase().replace(/\/$/u, ""));
   if (same.some((s, i) => same.indexOf(s) !== i || s === REGISTRY.toLowerCase())) throw new Error(`the config's "nuget.sources" names a source twice, or NuGet's own registry, which every restore takes from already. Mend: name each source once, and NuGet's registry not at all`);
-  const unread = nuget.unread ?? {};
-  if (!unread || typeof unread !== "object" || Array.isArray(unread) || Object.entries(unread).some(([f, lines]) => !f || !Array.isArray(lines) || !lines.length || lines.some((l) => typeof l !== "string" || !l.trim()))) throw new Error('the config\'s "nuget.unread" is not a map from a file, as git lists it, to the forms declared there, each a line as this check prints it. Mend: write it so, or take it out');
-  return { ships, tools, accepted, sources, unread };
+  return { ships, tools, accepted, sources, unread: unreadOf(nuget.unread ?? {}) };
+}
+// (the config's "nuget.unread", checked: a map from a file to the lines of the forms declared there)
+function unreadOf(unread) {
+  const line = (l) => typeof l === "string" && l.trim() !== "";
+  if (!unread || typeof unread !== "object" || Array.isArray(unread) || !Object.entries(unread).every(([f, lines]) => f && Array.isArray(lines) && lines.length && lines.every(line))) throw new Error('the config\'s "nuget.unread" is not a map from a file, as git lists it, to the forms declared there, each a line as this check prints it. Mend: write it so, or take it out');
+  return unread;
 }
 
 /** Where a restore takes packages from, in order: NuGet's own registry, then the sources the config names, a folder
