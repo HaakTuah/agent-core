@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { foldedLoop, inTime, scratchDir } from "../scripts/scratch-core.mjs";
 import { FLOOR, MAKE, START } from "../scripts/reading.mjs";
 import { OPEN, candidates, conditions, cuts, tasks, total } from "../scripts/read-total.mjs";
 
@@ -121,6 +121,14 @@ execFileSync("git", ["init", "-q"], { cwd: proj });
 const inProject = spawnSync(process.execPath, [path.join(copy, "read-total.mjs"), "--compare", "HEAD"], { cwd: proj, encoding: "utf8" });
 fs.rmSync(proj, { recursive: true, force: true });
 ok(inProject.status === 0 && /^not run: the total read reads the core's own repository alone/.test(inProject.stdout), "in a project's copy of the core it reads nothing, says so, and fails nothing", inProject.stdout + inProject.stderr);
+
+// (a link whose spelling leads back to itself, read by the system out of the tree through a folder link: no file, and
+// the reading ends)
+const folded = scratchDir("read-total-folded-");
+if (foldedLoop(folded, "AGENTS.md")) {
+  const said = inTime(`import { tree } from ${JSON.stringify(new URL("../scripts/read-total.mjs", import.meta.url).href)};\nconsole.log(JSON.stringify(tree(null, ${JSON.stringify(folded)}).read("AGENTS.md")));`);
+  ok(said?.trim() === "null", "a link whose spelling leads back to itself, through a folder link out of the tree, is read as no file, and the reading ends", said ?? "stopped past its time");
+}
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the total read`);
 process.exit(failed ? 1 : 0);

@@ -207,9 +207,9 @@ export function copyOf(dir) {
 // package, leads to the same place in the copy, so that its faults are the copy's; one that leads into a node_modules
 // (pnpm's store) or outside, to where it led; a dangling one is left out.
 function linkInstalled(installed, to, dir) {
-  const root = fs.realpathSync("."), inCopy = from => {
+  const root = fs.realpathSync.native("."), inCopy = from => {
     try {
-      const inside = path.relative(root, fs.realpathSync(from));
+      const inside = path.relative(root, fs.realpathSync.native(from));
       return inside && !inside.startsWith("..") && !path.isAbsolute(inside) && !inside.split(path.sep).includes("node_modules") ? path.join(path.resolve(dir), inside) : null;
     } catch { return null; }
   }, entries = []; // each entry of the folder, and of a @scope folder in it, with its place in the copy
@@ -226,7 +226,7 @@ function linkInstalled(installed, to, dir) {
   for (const [from, at] of entries) {
     let target = path.resolve(from);
     if (fs.lstatSync(from).isSymbolicLink()) {
-      try { target = fs.realpathSync(from); } catch { continue; }
+      try { target = fs.realpathSync.native(from); } catch { continue; }
       target = inCopy(from) ?? target;
     }
     fs.mkdirSync(path.dirname(at), { recursive: true });

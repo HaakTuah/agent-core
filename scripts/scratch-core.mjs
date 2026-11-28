@@ -83,6 +83,29 @@ export function scratchDir(prefix) {
   return tmp;
 }
 
+/** A link at `<dir>/<at>` whose text, "far/../" and its own name, leads back to itself where it is read by its spelling,
+ *  as node's own realpath (fs.realpathSync) reads it, which then never ends; the system reads it through "far" beside
+ *  it, a link to a folder of a scratch folder of its own, as the file "away" beside that folder. For a test that a check
+ *  never walks a path a project's files shape by that realpath. Null on Windows, which reads a `..` by its spelling;
+ *  else the file it leads to. */
+export function foldedLoop(dir, at) {
+  if (process.platform === "win32") return null;
+  const away = scratchDir("folded-loop-"), name = path.basename(at), from = path.dirname(path.join(dir, at));
+  fs.mkdirSync(path.join(away, "deep"));
+  fs.writeFileSync(path.join(away, name), "away\n");
+  fs.mkdirSync(from, { recursive: true });
+  fs.symlinkSync(path.join(away, "deep"), path.join(from, "far"));
+  fs.symlinkSync(`far/../${name}`, path.join(from, name));
+  return path.join(away, name);
+}
+
+/** What the module code `code` prints, run in a process of its own from `cwd`, stopped past `seconds`; null where it
+ *  failed or was stopped. For a test of a call that may never end. */
+export function inTime(code, { cwd, seconds = 30 } = {}) {
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", code], { cwd, encoding: "utf8", timeout: seconds * 1000, killSignal: "SIGKILL" });
+  return r.error || r.status !== 0 ? null : r.stdout;
+}
+
 /** The folder a project's session reads a mend from, for a test that reads one written for a project: it names the
  *  copy's path (`node core/scripts/x.mjs`), which the core's own folder does not hold. A scratch folder whose
  *  `core/scripts` is a link to this core's scripts (a mend names scripts alone), made once for the process for each

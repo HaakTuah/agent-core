@@ -84,7 +84,7 @@ function copyAgainstPin(root, bare, why, said) {
 // copy's pointers.mjs runs only where this script is that copy's, or the copy was found whole at its pin: one run from
 // a clone never runs a copy that was changed.)
 function pointers(root, at, whole, said) {
-  const real = f => { try { return fs.realpathSync(f); } catch { return null; } };
+  const real = f => { try { return fs.realpathSync.native(f); } catch { return null; } };
   if (!whole && real(HERE) !== real(path.join(root, at, "scripts"))) return said.unread("the pointers", `${at} was not found whole at its pin, and this script is not that copy's, so its pointers.mjs was not run`);
   const r = spawnSync(process.execPath, [path.join(root, at, "scripts", "pointers.mjs")], { cwd: root, env: { ...process.env, POINTERS_BASE: "" }, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 26 });
   const lines = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.split("\n").map(l => l.replace(/^::warning::/u, ""));

@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
-import { tally } from "../scripts/scratch-core.mjs";
+import { foldedLoop, inTime, tally } from "../scripts/scratch-core.mjs";
 import { CALL, LONE, RUN, fetched, git, project, run, write } from "../scripts/twice-scratch.mjs";
 
 const { ok, done } = tally();
@@ -75,6 +75,16 @@ for (const [form, [file, content]] of Object.entries(FORMS)) {
   const r = run(dir, "--fix", ...fetched);
   ok(has(dir, "core/docs/zephyr-notes.md") && !/docs2\//u.test(r.stdout), "nothing is taken out through a folder that is a link", r.stdout);
   ok(!/twin\.yml/u.test(r.stdout) && fs.lstatSync(path.join(dir, ".github/workflows/twin.yml")).isSymbolicLink(), "a workflow that is a link is not read as the project's own", r.stdout);
+}
+
+// A link whose spelling leads back to itself, read by the system out of the project through a folder link, is a link,
+// and reading it ends.
+{
+  const dir = project("folded");
+  if (foldedLoop(dir, "loop.md")) {
+    const said = inTime(`import { linked } from ${JSON.stringify(new URL("../scripts/twice-files.mjs", import.meta.url).href)};\nconsole.log(linked({ root: ${JSON.stringify(dir)} }, "loop.md"));`);
+    ok(said?.trim() === "true", "a link whose spelling leads back to itself, through a folder link out of the project, is read as a link, and the reading ends", said ?? "stopped past its time");
+  }
 }
 
 // The library that carries the core is another repository's: none of its files is read as the project's own.

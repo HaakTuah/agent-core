@@ -76,7 +76,7 @@ export function vitestAt(root) {
   if (typeof named !== "string") return null;
   const at = path.posix.join(folder, named.replaceAll("\\", "/"));
   try {
-    const real = fs.realpathSync(path.join(root, at)), inside = path.relative(fs.realpathSync(path.join(root, folder)), real);
+    const real = fs.realpathSync.native(path.join(root, at)), inside = path.relative(fs.realpathSync.native(path.join(root, folder)), real);
     return at.startsWith(`${folder}/`) && inside && inside.split(path.sep)[0] !== ".." && !path.isAbsolute(inside) && fs.statSync(real).isFile() ? at : null;
   } catch { return null; }
 }
