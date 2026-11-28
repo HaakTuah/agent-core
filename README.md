@@ -328,9 +328,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      request (a private one, the one job's `nuget:`; or its own call, started only on a pull request that changes a
      file NuGet reads by name, so no other bills a job), with the licence check's config: first `lookup.mjs --nuget`,
      which asks NuGet's registry of each package new to the lock files as the licence check asks npm's (floor topic 15);
-     then a restore of each project file git knows from its
-     lock file alone (`dotnet restore --locked-mode`, floor rule 15), taking packages from NuGet's own registry and from
-     what the config's "nuget.sources" names, whatever a NuGet.Config says (floor rule 7), then `nuget.mjs`, which reads
+     then a restore of each project file git knows from its lock file alone (`dotnet restore --locked-mode`, floor rule
+     15), each into a folder of its own that is read and taken out before the next project's restore, taking packages
+     from NuGet's own registry and from what the config's "nuget.sources" names, whatever a NuGet.Config says (floor
+     rule 7), each read by `nuget.mjs`, which reads
      from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
      lock files to one exact version (floor rule 7) and to its licence list (floor rule 10), each licence read from the
      manifest of the package the restore brought; what the restore brought that no lock file names is held to the list

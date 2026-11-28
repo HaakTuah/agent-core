@@ -56,8 +56,9 @@
 //   - what the restore brought and no lock file read here names (a targeting pack, a PackageDownload, an SDK a project
 //     file names): its licence is held to the list for what ships all the same, by its manifest, the audit or a yes.
 // What it does not hold: that the lock files are what a restore gives today (the workflow that runs this,
-// .github/workflows/nuget.yml, restores each project file this script lists with --locked-mode first, which fails
-// where they are not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
+// .github/workflows/nuget.yml, restores each project file this script lists with --locked-mode first, each into a
+// folder of its own, read with --lock and taken out before the next project's restore, which fails where they are
+// not: floor rule 15); the version and the content hash of what no lock file names, which the SDK or a
 // project file fixes and no lock file holds; a package taken from a fallback folder that a NuGet.Config names, which a
 // restore does not copy into the folder read here (one a lock file names then fails as not restored; one that none
 // names goes unseen, and such a folder stands in the pull request for the reviews to see); what a file an Import or
@@ -94,7 +95,11 @@
 //
 //   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--restored] [--advisory]
 //                                               with --restored, run after a restore that the read with --fetched on
-//                                               the same checkout came before: nothing of git's read for the base
+//                                               the same checkout came before: nothing of git's read for the base; and
+//   ... --restored --lock <the lock file of the one project restored into that folder>
+//                                               the read after one project's restore, each into a folder of its own:
+//                                               what only another project's lock file names is read where it is
+//                                               restored, and no accepted version is found stale
 //   node core/scripts/nuget.mjs <config> --packages <the folder nuget-fetch.mjs filled> --fetched [--advisory]
 //                                               the same, before the restore: the licences of what the lock files name,
 //                                               and of the tools a manifest of dotnet's names, read from files no pull
@@ -866,12 +871,12 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false } = {}) {
+export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false, lock = null } = {}) {
   const copy = copyAside(root), { ships, tools, accepted, sources, unread } = nugetConfig(config, copy);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (the check's own state, which the parts below read and add to)
-  const c = { config, root, copy, base, packagesDir, fetched, restored, lists, allowedFor, ships, unread, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
+  const c = { config, root, copy, base, packagesDir, fetched, restored, lock, lists, allowedFor, ships, unread, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
   const own = tracked.filter((f) => !under(f, copy));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   layoutFaults(c, tracked, own, locks);
@@ -908,7 +913,9 @@ export function check(config, root, packagesDir, tracked, env = process.env, { b
     }
   }
   for (const k of toolsRead) { c.used.add(k); c.read.add(k); }
-  unusedFaults(c, accepted);
+  // (read for one project's restore, an accepted version another project installs is no stale one here)
+  if (lock === null) unusedFaults(c, accepted);
+  else if (!listed.includes(lock)) failures.push(`${lock}, the lock file this read is for, is none the config names. Mend: name the lock file beside the project restored, as git lists it`);
   const summary = summaryOf(c, packages, listed, unnamed);
   return { failures: failures.map(shown), reports: reports.map(shown), summary };
 }
@@ -1126,7 +1133,8 @@ function lockedPackages(c, listed, locks) {
         const x = shown(`${f}: ${p.id}@${p.version} named by another content hash than in ${was.lock}: ${twoHashes}`);
         if (lockAsBase(c, f, text) && lockAsBase(c, was.lock, lockText(c, was.lock))) c.reports.push(`${x} ${heldBefore}`); else c.failures.push(x);
       }
-      if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f });
+      if (!was || (shipped && !was.shipped)) packages.set(k, { ...p, shipped, lock: f, locks: new Set([...(was?.locks ?? []), f]) });
+      else was.locks.add(f);
     }
   }
   return packages;
@@ -1201,6 +1209,8 @@ function judge(c, k, p) {
   const manifest = join(packagesDir ?? "", p.id.toLowerCase(), p.version.toLowerCase(), `${p.id.toLowerCase()}.nuspec`);
   // (before the restore, one the fetch could not reach is read after it: the fetch said so)
   if (c.fetched && (!packagesDir || !existsSync(manifest))) { c.used.add(k); c.read.add(k); return; }
+  // (read for one project's restore, a package only another's lock file names is read where that one is restored)
+  if (c.lock !== null && !p.locks?.has(c.lock) && !existsSync(manifest)) { c.used.add(k); c.read.add(k); return; }
   if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read. Mend: restore from the lock files first (dotnet restore --locked-mode), then run the check`); return; }
   takenFaults(c, name, where, manifest);
   const text = regularText(manifest, { bound: BOUND });
@@ -1295,7 +1305,8 @@ if (guard(import.meta.url)) {
     process.exit(0);
   }
   const at = args.indexOf("--packages"), packagesDir = at >= 0 ? args[at + 1] : undefined;
-  const configPath = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1));
+  const lockAt = args.indexOf("--lock"), lock = lockAt >= 0 ? args[lockAt + 1] ?? "" : null;
+  const configPath = args.find((a, i) => !a.startsWith("--") && (at < 0 || i !== at + 1) && (lockAt < 0 || i !== lockAt + 1));
   if (args.includes("--sources")) {
     if (!configPath) fail("no config was named. Mend: name it: node core/scripts/nuget.mjs <config> --sources");
     let from;
@@ -1307,12 +1318,13 @@ if (guard(import.meta.url)) {
   // (the config is read only where it is a file of bytes: a device would never end)
   try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
   if (args.includes("--restored") && args.includes("--fetched")) fail("--restored and --fetched were both given: --restored is for the run after a restore, which the read with --fetched comes before. Mend: run the read with --fetched before the restore and the one with --restored after it, each on its own");
+  if (lock !== null && !args.includes("--restored")) fail("--lock was given without --restored: it names the lock file of the one project a restore just restored. Mend: give it beside --restored alone, after that project's restore");
   let result;
   try {
     const { root, tracked } = project(), config = loadConfig(configPath, root);
     // (after a restore, no base: what git would read it by, the restore could have written)
     const restored = args.includes("--restored"), base = restored ? null : baseOf(root);
-    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored });
+    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored, lock });
   } catch (e) { fail(e.message); }
   for (const r of result.reports) console.log(`REPORT: ${r}`);
   for (const f of result.failures) console.error(`${advisory ? "WOULD FAIL" : "FAIL"}: ${f}`);

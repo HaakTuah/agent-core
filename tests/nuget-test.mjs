@@ -695,6 +695,20 @@ user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/Ap
 ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
 
+// read for one project's restore (--lock), each into a folder of its own: what only another project's lock file names
+// is read where that one is restored, what this one's names must stand here, and no accepted version is found stale;
+// a lock file the config does not name fails, and the flag stands only beside --restored
+{
+  put(L, lock(direct(["Newtonsoft.Json", "13.0.3"]))); put(T, lock(direct(["Weak.Copy", "2.1.0"]))); put("checks/audit.json", JSON.stringify({ entries: [] }));
+  const cfg = { ships: [], audit: "checks/audit.json", nuget: { ships: [L], tools: [T], accepted: [accepted("Weak.Copy", "2.1.0", "LGPL-3.0-only", { ships: false })] } };
+  const one = (lockFile) => check(cfg, tmp, restore("Newtonsoft.Json@13.0.3"), TRACKED, process.env, { restored: true, lock: lockFile });
+  const whole = one(null), first = one(L), second = one(T), other = one("src/Other/packages.lock.json");
+  ok(first.failures.length === 0 && whole.failures.some(x => x.startsWith("Weak.Copy@2.1.0") && x.includes("not in the restore's folder")), "read for one project's restore, a package only another's lock file names is left to that one's read, where a read of the whole fails it", JSON.stringify({ first, whole }));
+  ok(second.failures.length === 1 && second.failures[0].startsWith(`Weak.Copy@2.1.0 (${T}): its manifest is not in the restore's folder`), "and one its own lock file names must stand in its folder", JSON.stringify(second));
+  ok(other.failures.some(x => x.startsWith("src/Other/packages.lock.json, the lock file this read is for, is none the config names. Mend: ")), "a lock file the config does not name fails", JSON.stringify(other));
+  const bare = spawnSync(process.execPath, [path.join(here, "nuget.mjs"), "checks/licences.json", "--packages", "x", "--lock", L], { cwd: tmp, encoding: "utf8" });
+  ok(bare.status === 1 && heard(bare.stdout + bare.stderr).includes("--lock was given without --restored"), "--lock without --restored is refused, saying its mend", bare.stdout + bare.stderr);
+}
 // what the read before the restore does not read in a build file: each target, task, and item that downloads a package
 // or names a pack the SDK downloads, whole, and an SDK taken from a package, by its tag; none in a comment
 {

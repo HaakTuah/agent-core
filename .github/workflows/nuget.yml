@@ -1,10 +1,12 @@
 # The NuGet check (floor rules 7, 10 and 15), for a project whose packages come from NuGet (.NET): on every pull
 # request, Dependabot's included, it restores each project file git knows from its lock file alone, with the .NET SDK
 # the runner holds (`dotnet restore --locked-mode`, NuGet's own tool, which fails where a lock file is not what the
-# project file asks for, and holds each package to the hash its lock file names), into a folder of its own; and then
-# runs the caller's own core/scripts/nuget.mjs, which holds every package in those lock files, and whatever else the
-# restore brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
-# manifest of the package the restore brought. What that script holds and does not, it says itself. A project calls
+# project file asks for, and holds each package to the hash its lock file names), each into a folder of its own; and
+# after each project's restore, before the next's, runs the caller's own core/scripts/nuget.mjs on that folder (with
+# --restored and the project's lock file), which holds every package in the lock files, and whatever else the restore
+# brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
+# manifest of the package the restore brought, the folder then taken out, so that no project's restore runs beside
+# what another's brought. What that script holds and does not, it says itself. A project calls
 # this (workflow_call) from a workflow of its own of the same name, on every pull request (a private repository, as the
 # starter kit writes its call, on one that changes a file NuGet reads by name, so that no other bills a job), pinned
 # to a full commit SHA ("How a project takes the core" in README.md, point 5), passing the licence check's config, or
