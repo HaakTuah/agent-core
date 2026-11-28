@@ -355,7 +355,8 @@ const RUN = {
 // Whether the code checked out is proven the repository's own, so that a restore may run its build files: in a workflow
 // (GITHUB_ACTIONS), where the event is a pull request whose event file names its head repository as this one (a missing
 // head repository, a fork's that was deleted, counting as another's), or a push, a schedule, a person's dispatch or a
-// pull request in the merge queue, which only a writer starts or merges, with the event file the runner writes; any
+// pull request in the merge queue, whose code a writer accepts as the repository's own by queuing it to merge, with the
+// event file the runner writes (only a writer starts or merges any of these); any
 // other event (pull_request_target, workflow_run) proves nothing. Elsewhere only with --own-repository, which the daily
 // try and a release's trial give for the clones they make of the owner's own projects (check.mjs, which writes the
 // event file its steps read only then, so its push counts as the repository's own only with it), and another host's
