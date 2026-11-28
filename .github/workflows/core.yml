@@ -432,7 +432,7 @@ jobs:
           # hold nothing, and no git runs inside it. Where anything git does not know then stands, the check does not run.
           # The check reads the config's form without ajv, the one package of the core's it would read, by its own checks
           # of that form; no step follows)
-          git reset -q --hard HEAD && git clean -ffdxq
+          git reset -q --hard HEAD && git clean -ffdxq || :
           # (git failing to list or read a folder counts as something standing there: fails closed)
           bare() {
             local e p f s l
@@ -441,12 +441,12 @@ jobs:
               [ "${e%% *}" = 160000 ] || continue; p=$1${e#*$'\t'}
               if [ ! -L "$p" ] && [ "${CORE_AT#"$p"/}" != "$CORE_AT" ]; then
                 git -C "$p" reset -q --hard HEAD && git -C "$p" clean -ffdxq || return 1
-                s=$(git -C "$p" status --porcelain --ignored --untracked-files=all --ignore-submodules=all) || return 1
+                s=$(git -C "$p" status --porcelain --ignored --untracked-files=all --ignore-submodules=all 2>&1) || return 1
                 [ -z "$s" ] && bare "$p/" || return 1
               elif [ -L "$p" ] || { [ -e "$p" ] && { ! l=$(ls -A -- "$p" 2> /dev/null) || [ -n "$l" ]; }; }; then return 1; fi
             done < "$f"; rm -f "$f"
           }
-          top=$(git status --porcelain --ignored --untracked-files=all --ignore-submodules=all) || top="git could not read the checkout"
+          top=$(git status --porcelain --ignored --untracked-files=all --ignore-submodules=all 2>&1) || top="git could not read the checkout"
           if [ -n "$top" ] || ! bare ""; then
             echo "FAIL the checkout still holds what git does not know once what HEAD holds was put back (a file a step before wrote, or a folder git records as a submodule that holds files or is a link), or git could not read it, so the NuGet check's restore does not run. Mend: keep each folder git records as a submodule out of what a step before writes (an install's folder of packages), or take that submodule out; then run the check again"; exit 1
           fi
