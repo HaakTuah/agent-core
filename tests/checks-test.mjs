@@ -193,8 +193,8 @@ if (process.platform !== "win32") {
   const beside = lacked();
   ok(beside.status === 1 && /^\d of \d+ checks failed, each saying its mend above: Each package new/m.test(beside.out) && /could not run here, since this machine lacks dotnet/.test(beside.out), "  and where a check failed beside them, the run fails", beside.out);
 }
-// nuget: the run after the restore is told so (--restored), whether or not the look itself restored, and the read
-// before it is not: after a restore, the script reads nothing of git's for the base. A stand-in for dotnet passes each
+// nuget: the read before the restore runs whatever the look says it ran, and the run after the restore is told so
+// (--restored), the read before it not: after a restore, the script reads nothing of git's for the base. A stand-in for dotnet passes each
 // restore; on Linux, where it is a script of the shell's.
 if (process.platform !== "win32") {
   const dir = project();
@@ -207,8 +207,8 @@ if (process.platform !== "win32") {
     const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}` });
     const after = r.out.indexOf("ran dotnet restore"), runs = [...r.out.matchAll(/^ran nuget\.mjs \[checks\/licences\.json --packages (.*)\]/gm)];
     const last = runs.at(-1), before = runs.filter(m => m.index < after);
-    ok(r.status === 0 && after >= 0 && last.index > after && / --restored$/.test(last[1]) && before.length === (built === "true" ? 0 : 1) && before.every(m => / --fetched$/.test(m[1]) && !m[1].includes("--restored")),
-      `nuget: where the look ${built === "true" ? "itself restored" : "did not restore"}, the run after the restore is given --restored${built === "true" ? "" : ", and the read before it is not"}`, r.out);
+    ok(r.status === 0 && after >= 0 && last.index > after && / --restored$/.test(last[1]) && before.length === 1 && before.every(m => / --fetched$/.test(m[1]) && !m[1].includes("--restored")),
+      `nuget: whatever the look says it ran (built=${built}), the read before the restore runs, and the run after it is given --restored and that one not`, r.out);
   }
 }
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,

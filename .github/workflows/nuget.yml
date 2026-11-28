@@ -17,12 +17,14 @@
 # it reads included: so before the restore a step fetches every package the lock files name, and every tool a manifest
 # of dotnet's names (dotnet-tools.json, in .config/ or any folder), holds each package to its lock file's content hash
 # and reads each licence from its own file (core/scripts/nuget-fetch.mjs, then nuget.mjs with --fetched; core archive
-# 201), a verdict no build has run beside (where the first look below has itself restored, it is left out: nothing it
-# reads changed from the base, whose verdict stands); after the restore the script reads nothing of git's for the base
-# (nuget.mjs with --restored), since the restore could have rewritten what git reads it by, each comparison with the
-# base having been made before it; and this runs with contents: read and no secret, nothing after the checkout holds
-# the token, and what a pull request does to its project files is the reviews' to read, as with every check that
-# builds. Where the packages come from is this restore's to say (floor rule 7): NuGet's own registry and the
+# 201), and each build file as committed, failing a form in one that it does not read (a target, a task, a download or
+# an SDK from a package, an Import it cannot follow) unless the base held it or the config declares it: a verdict no
+# build of the pull request's has run beside (the first look below runs a build only where nothing it reads changed from
+# the base); after the restore the script reads nothing of git's for the base (nuget.mjs with --restored), since the
+# restore could have rewritten what git reads it by, each comparison with the base having been made before it, and
+# what a target or a task the base held or the config declares writes once the restore runs it, it reads as it finds
+# it; and this runs with contents: read and no secret, nothing after the checkout holds the token, no step runs after
+# it, and what a pull request does to its project files is the reviews' to read, as with every check that builds. Where the packages come from is this restore's to say (floor rule 7): NuGet's own registry and the
 # sources the config names, given to every restore, which overrules what a NuGet.Config names, and the script then
 # reads, by NuGet's own record beside each package it brought (.nupkg.metadata), that it took none from elsewhere; a
 # source that asks for a sign-in has none here. A project for Windows alone restores here all the same

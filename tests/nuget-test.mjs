@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NOT_A_FILE, REGISTRY, check as checked, importPath, imported, importsOf, lockPackages, plainText, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sourcesOf } from "../scripts/nuget.mjs";
+import { NOT_A_FILE, REGISTRY, check as checked, formsIn, importPath, imported, importsOf, lockPackages, plainText, projectFilesByContent, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sdksNamed, sourcesOf } from "../scripts/nuget.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { fetchAll } from "../scripts/nuget-fetch.mjs";
 import { packagesOf } from "../scripts/lookup.mjs";
@@ -694,6 +694,64 @@ inRepo("src/Wide/Wide.csproj", "<Project />");
 user = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), ["src/App/App.csproj", L, "src/Wide/Wide.csproj", WIDE_USER], process.env, { base: "HEAD", baseConfig: null });
 ok(user.failures.some(x => x.startsWith(`${WIDE_USER} is not plain UTF-8`)), "a .user file not plain UTF-8, held beside no project file, which the pull request brings into play: it fails", JSON.stringify(user));
 fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no wide .user file");
+
+// what the read before the restore does not read in a build file: each target, task, and item that downloads a package
+// or names a pack the SDK downloads, whole, and an SDK taken from a package, by its tag; none in a comment
+{
+  const forms = formsIn(`<Project Sdk="Microsoft.NET.Sdk"><!-- <Target Name="Old" /> --><ItemGroup><PackageReference Include="A" Version="1.0.0" /><PackageDownload Include="B" Version="[1.0.0]" />
+    <packagedownload Include="C"><Version>[2.0.0]</Version></packagedownload><KnownFrameworkReference Include="F" TargetingPackName="P" /><DotNetCliToolReference Include="T" Version="1.0.0" /></ItemGroup>
+    <Target Name="Hook" BeforeTargets="CollectPackageDownloads"><!-- </Target> --><CreateItem Include="D"><Output TaskParameter="Include" ItemName="$(N)" /></CreateItem></Target>
+    <UsingTask TaskName="X" TaskFactory="RoslynCodeTaskFactory"><Task><![CDATA[ </UsingTask> ]]></Task></UsingTask><Import Project="Sdk.props" Sdk="S" Version="1.0.0" /><Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" /><Sdk Name="E" Version="2.0.0" /><Sdk Name="Microsoft.NET.Sdk.Web" /></Project>`);
+  ok(forms.length === 8 && forms[0] === '<PackageDownload Include="B" Version="[1.0.0]" />' && forms[1] === '<packagedownload Include="C"><Version>[2.0.0]</Version></packagedownload>' && forms[4].startsWith('<Target Name="Hook"') && forms[4].endsWith("</CreateItem></Target>") && forms[5].endsWith("]]></Task></UsingTask>")
+    && forms[6] === '<Import Project="Sdk.props" Sdk="S" Version="1.0.0" />' && forms[7] === '<Sdk Name="E" Version="2.0.0" />' && !forms.some(x => x.includes("Old") || x.includes("PackageReference") || x.includes("Microsoft.NET.Sdk")),
+    "a download, a pack named, a tool, a target and a task are read whole, an end tag in a comment or CDATA no end, and an SDK with a version by its tag; a package reference, an SDK of the SDK's own and a comment are none", JSON.stringify(forms));
+  ok(formsIn(`<Project Sdk="Microsoft.NET.Sdk;My.Sdk/1.0.0">`).length === 1 && formsIn(`<Project><Target Name="T"><Exec Command="x" />`).join() === '<Target Name="T"><Exec Command="x" />' && formsIn(`<Project><Target Name="A"><Target Name="B" /></Target><Target Name="C" /></Project>`).length === 2,
+    "a project's SDK from a package is one, a target with no end is read to the file's, and one inside another is part of it");
+  ok(sdksNamed(`{ "sdk": { "version": "8.0.100" } }`).length === 0 && sdksNamed(`{ "MSBuild-SDKs": { "My.Sdk": "1.0.0" } }`).join() === 'msbuild-sdks: My.Sdk "1.0.0"' && sdksNamed(`{ // a comment\n "sdk": {} }`).join() === "a global.json that is not JSON",
+    "a global.json's SDKs from packages are named, the key in any case, and one that is not JSON is one form of its own");
+  ok(throws(() => nugetConfig({ nuget: { unread: [] } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [] } } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [" "] } } })) && nugetConfig({ nuget: { unread: { "a.props": ["imports x"] } } }).unread["a.props"].length === 1,
+    "the config's \"nuget.unread\" is a map from a file to the lines of the forms declared there");
+}
+// with a base: a form the pull request adds fails with its mend; one the base held in the same file, or one the
+// config's "nuget.unread" declares word for word, is reported and passes; a line declared that no form matches fails;
+// with no base, each is reported; after the restore, which the read before it held them in, none is read
+{
+  const DBP = "Directory.Build.props", tracked = ["src/App/App.csproj", L, DBP, "global.json"];
+  // (the failures of the forms alone: the lock file this repository holds by now is no part of the case)
+  const formCheck = (unread, base = "HEAD") => { const x = check({ ships: [], nuget: { tools: [L], ...(unread ? { unread } : {}) } }, repo, restore(), tracked, process.env, { base, baseConfig: null, fetched: true }); return { ...x, failures: x.failures.filter(f => !f.startsWith(L)) }; };
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup></Project>`); inRepo("global.json", `{ "sdk": { "version": "8.0.100" } }`); git("add", "-A"); git("commit", "-q", "-m", "a build file");
+  const DOWNLOAD = `<PackageDownload Include="Some.Pkg" Version="[1.0.0]" />`, IMPORT = `<Import Project="$(Elsewhere)/more.props" />`;
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`); inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`);
+  let r = formCheck();
+  ok(r.failures.some(x => x.startsWith(`${DBP} holds what the read before the restore does not follow`) && x.includes(DOWNLOAD) && x.includes('"nuget.unread"')) && r.failures.some(x => x.startsWith(`${DBP} imports $(Elsewhere)/more.props, a file whose path this check cannot know without the build`))
+    && r.failures.some(x => x.startsWith('global.json names an SDK MSBuild takes from a package') && x.includes('msbuild-sdks: My.Sdk "1.0.0"')),
+    "a download, an Import the check cannot follow and an SDK from a package that the pull request adds each fail, saying the line that declares it", JSON.stringify(r));
+  r = formCheck(null, null);
+  ok(r.failures.length === 0 && r.reports.filter(x => x.includes("(reported, and passes)")).length >= 3, "with no base, each is reported and passes", JSON.stringify(r));
+  const after = check({ ships: [], nuget: { tools: [L], unread: { "src/Gone.props": ["imports x"] } } }, repo, restore(), tracked, process.env, { base: null, baseConfig: null, restored: true });
+  ok(!after.failures.some(x => x.includes("nuget.unread")) && !after.reports.some(x => x.includes(DOWNLOAD) || x.includes("more.props") || x.includes("My.Sdk")), "after the restore, no form is read again, nor a line declared", JSON.stringify(after));
+  r = formCheck({ [DBP]: [DOWNLOAD, `imports  $(Elsewhere)/more.props`], "global.json": ['msbuild-sdks: My.Sdk "1.0.0"'] });
+  ok(r.failures.length === 0 && r.reports.filter(x => x.includes(`(declared in the config's "nuget.unread": reported, and passes)`)).length === 3, "each declared word for word, its blanks aside, is reported and passes", JSON.stringify(r));
+  r = formCheck({ [DBP]: [DOWNLOAD, DOWNLOAD, "imports $(Elsewhere)/more.props"], "global.json": ['msbuild-sdks: My.Sdk "1.0.0"'], "src/Gone.props": ["imports x"] });
+  ok(r.failures.filter(x => x.startsWith(`the config's "nuget.unread" declares, for`)).length === 2 && r.failures.every(x => x.startsWith(`the config's "nuget.unread" declares, for`)), "a line declared that no form matches fails, one declared twice for one form and one for a file with none", JSON.stringify(r));
+  git("add", "-A"); git("commit", "-q", "-m", "forms");
+  r = formCheck();
+  ok(r.failures.length === 0 && r.reports.filter(x => x.includes("held before this check read it")).length === 3, "the same forms, as the base held them in the same files: reported, and pass", JSON.stringify(r));
+  const TARGET = `<Target Name="Hook" BeforeTargets="CollectPackageDownloads"><ItemGroup><PackageDownload Include="Other.Pkg" Version="[2.0.0]" /></ItemGroup></Target>`;
+  inRepo(DBP, `<Project><PropertyGroup><X>2</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}${TARGET}</Project>`);
+  r = formCheck();
+  ok(r.failures.length === 1 && r.failures[0].includes(TARGET) && r.reports.filter(x => x.includes("held before this check read it")).length === 3, "a target the pull request adds beside them fails, read whole, while what the base held still passes", JSON.stringify(r));
+  inRepo(DBP, `<Project><!DOCTYPE p><X /></Project>`);
+  inRepo("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "x">]><Project />`);
+  r = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, "build/Typed.props"], process.env, { base: "HEAD", baseConfig: null, fetched: true });
+  ok(r.failures.some(x => x.startsWith("build/Typed.props has a document type, so this check does not read its Imports, nor what they bring in. Mend: ")), "a build file with a document type that the pull request adds fails", JSON.stringify(r));
+  fs.rmSync(path.join(repo, "build/Typed.props")); fs.rmSync(path.join(repo, DBP)); fs.rmSync(path.join(repo, "global.json")); git("add", "-A"); git("commit", "-q", "-m", "no forms");
+}
+// a file whose root element is a Project, in UTF-16 or UTF-32 with no byte-order mark, which a reader of XML knows by
+// its first "<" and the NULs beside it, is read as one by what it is, so that the first look diffs it too
+put("build/wide.xml", Buffer.from(`<?xml version="1.0"?><Project />`, "utf16le")); put("build/wider.xml", Buffer.from(`<?xml version="1.0"?><Project />`, "utf16le").swap16());
+put("build/widest.xml", Buffer.concat([...`<?xml version="1.0"?><Project />`].map(ch => { const b = Buffer.alloc(4); b.writeUInt32LE(ch.codePointAt(0)); return b; })));
+ok(projectFilesByContent(tmp, ["build/wide.xml", "build/wider.xml", "build/widest.xml"]).length === 3, "a project in UTF-16 or UTF-32 with no byte-order mark is read as one by what it is");
 
 {
   // (read once, however many comments it holds: past a second here, it would read the text again for each)

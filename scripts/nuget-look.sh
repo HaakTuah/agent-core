@@ -2,7 +2,7 @@
 # The NuGet check's first look (core/scripts/checks.mjs, its part "nuget"; the header of .github/workflows/nuget.yml
 # says what it reads and why): whether the pull request changes anything NuGet reads, by git's own diff against the base
 # and, where none changed, by NuGet's own word from a restore against an empty source. It writes "run=false" to
-# $GITHUB_OUTPUT only where both say nothing changed, and "built=true" where it ran the pull request's build files. Run
+# $GITHUB_OUTPUT only where both say nothing changed. Run
 # by checks.mjs with bash -e, from the project's root, with BASE (the base's commit, empty with none), CONFIG (the
 # licence check's config), CALLER (the calling workflow's ref, empty with none), CORE_AT (the copy's folder, ending in
 # /), NUGET_PACKAGES (a folder of its own) and GITHUB_OUTPUT (the file it writes to). Git, bash, jq, the .NET SDK and
@@ -31,9 +31,6 @@ shown() { printf '%s\n' "$1" | LC_ALL=C tr '\000-\011\013-\037\177' '?' | LC_ALL
 named() { shown "${1//$'\n'/?}"; }
 holds() {
   local empty config stamp project out codes id projects locks records
-  # (from here the pull request's build files have run in this job: the licence read before the restore is
-  # left out, since nothing it reads changed from the base)
-  echo "built=true" >> "$GITHUB_OUTPUT"
   empty=$(mktemp -d) stamp=$(mktemp)
   # (a NuGet config of its own and nothing else, so that no NuGet.Config of the project's has a say: one that
   # maps packages to their sources maps none to the empty source, and NuGet would name that, not a package
@@ -113,7 +110,6 @@ if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | s
       echo "Nothing NuGet reads changed, and every lock file still holds what its project asks for: nothing to restore."
     else
       echo "A lock file no longer holds what its project asks for, or a project downloads a package beside it, or NuGet could not say: the check runs."
-      echo "That look ran the pull request's build files, so the licence read before the restore is left out: nothing it reads changed from the base."
     fi
   fi
 fi

@@ -301,8 +301,9 @@ const RUN = {
     const said = Object.fromEntries(fs.readFileSync(output, "utf8").split(/\r?\n/).filter(l => l.includes("=")).map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
     if (said.run === "false") return;
     // (before the restore, which runs the pull request's own build files: each package's file held to its lock file's
-    // content hash, and its licence read from it, in a step no build has run in; where the look restored, it is left out)
-    if (said.built !== "true" && !check("Every locked package and tool, fetched before the restore and held to its list", () => {
+    // content hash, and its licence read from it, and every build file read as committed, in a step no build of the
+    // pull request's has run in, whatever the look ran: it ran a build only where nothing it reads changed from the base)
+    if (!check("Every locked package and tool, fetched before the restore and held to its list", () => {
       const fetched = path.join(temp, "nuget-fetched");
       const got = node(coreAt, "nuget-fetch.mjs", [o.nuget, "--into", fetched]);
       return verdict(node(coreAt, "nuget.mjs", [o.nuget, "--packages", fetched, "--fetched", ...advisory]) && got);
@@ -335,8 +336,7 @@ const RUN = {
       return verdict(passed);
     })) return;
     // (after the restore, nothing of git's is read for the base, which the restore could have rewritten: each comparison
-    // with it was made before, by the read above or, where that was left out, by the look, which holds where the look's
-    // base is the merge's first parent, as on a pull request)
+    // with it was made before, by the read above)
     check("Every package one exact version, and under a licence on its list", () => node(coreAt, "nuget.mjs", [o.nuget, "--packages", packages, "--restored", ...advisory], { env: { NUGET_PACKAGES: packages } }));
   },
 };

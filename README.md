@@ -348,9 +348,10 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      lock files name, holds each to its lock file's content hash and reads its licence from it, so no build has run
      beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are
      fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
-     with a tool the pull request's base held, never read before this release, is reported, not failed). Where the first
-     look restored, which runs the pull request's build files, that read is left out: nothing it reads changed from the
-     base.
+     with a tool the pull request's base held, never read before this release, is reported, not failed). That read runs
+     before every restore of the check's, and reads the build files as committed: a target, a task, a download or an
+     SDK from a package, or an Import it cannot follow, fails there unless the base held it in the same file or the
+     config's "nuget.unread" declares it as the failure prints it, for the reviews to read what it brings in.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull
