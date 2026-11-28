@@ -141,10 +141,17 @@ ok(entries(git(p, "rev-parse", "HEAD:core"), path.join(p, ".git")) === entries(c
 const GH_ORIGIN = "https://github.com/someone/project.git", event = path.join(tmp, "event.json");
 fs.writeFileSync(event, JSON.stringify({ repository: { full_name: "someone/project", private: false } }));
 git(p, "config", `url.${slash(origin)}.insteadOf`, GH_ORIGIN);
+// (GitHub's API through gh, a stand-in that gives the project's open pull requests: by default one whose head is the
+// branch's, opened from a branch of the project's own repository, its id the host's number for it; own-head.mjs)
+const { env: reviewEnv, ghData, ghLog } = ghStandIn(env, tmp, origin);
+const REPO_ID = 4000 + 2, ours = { full_name: "someone/project", id: REPO_ID };
+const aPull = (sha, from = ours) => ({ number: 1, head: { sha, repo: from }, base: { sha: base, repo: ours } });
+const opens = (pulls = [aPull(git(p, "rev-parse", "HEAD"))]) => fs.writeFileSync(ghData, JSON.stringify(pulls ? { "pulls\\?state=open": pulls } : {}));
 const pure = (...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  opens(Array.isArray(args[0]) || args[0] === null ? args.shift() : undefined);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...reviewEnv, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -159,10 +166,11 @@ const coreCheck = () => {
 };
 // (whether the core is attached, as a session runs it on the sync's branch: pure-sync.mjs among its parts, run from the
 // core's side, its host's answer as above; #1081)
-const attachedHere = () => {
+const attachedHere = pulls => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  opens(pulls);
   try {
-    const r = spawnSync(process.execPath, ["core/scripts/attached.mjs"], { cwd: p, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, ["core/scripts/attached.mjs"], { cwd: p, env: { ...reviewEnv, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };
@@ -172,6 +180,24 @@ git(p, "repack", "-adq"); git(tmp, `--git-dir=${origin}`, "repack", "-adq"); // 
 ok(legit.status === 0 && legit.out.includes(`sha=${LEGIT}`), "the sync as the script makes it is pure, and the proof names the head it read", legit.out);
 ok(coreCheck().passed, "  and the core's own check of the copy passes it");
 ok(legitAttached.status === 0 && /^attached: /u.test(legitAttached.out) && !/^- the (sync|copy): /mu.test(legitAttached.out), "  and whether the core is attached, read on the sync's branch, finds its copy at its pin and the sync pure, run from the core's side", legitAttached.out);
+// floor rule 8's proof holds only for a head opened from a branch of the project's own repository, as the host says it
+// (own-head.mjs): each way that is not shown stops it at once, before anything of the head's is read, its mend said
+for (const [pulls, why, what] of [[null, /could not be read: gh gave no answer for someone\/project's open pull requests/, "gh gives no answer"],
+  [[aPull(LEGIT, { full_name: "stranger/project", id: REPO_ID + 1 })], /this head comes from a repository other than someone\/project, pull request #1, so nothing was run\. Mend: a sync is opened from a branch of the repository/, "its head comes from another repository"],
+  [[aPull(LEGIT, { full_name: "someone/project", id: REPO_ID + 1 })], /comes from a repository other than/, "its head's repository bears the project's name but is another"],
+  [[aPull(LEGIT, null)], /other than someone\/project, a fork since deleted/, "its head's repository is gone, a fork since deleted"],
+  [[aPull(LEGIT, { full_name: "someone/project" })], /lacks its head's or its base's repository/, "the host's answer lacks a field"],
+  [[aPull("0".repeat(40))], /no open pull request of someone\/project has this head/, "no open pull request has its head"]]) {
+  const r = pure(pulls);
+  ok(r.status === 1 && why.test(r.out) && (r.out.match(/NOT PURE/g) ?? []).length === 1 && !r.out.includes("sha="), `  and where ${what}, nothing is proved, and it stops at once`, r.out);
+}
+const twoPulls = pure([aPull(LEGIT), aPull(LEGIT, { full_name: "stranger/project", id: REPO_ID + 1 })]);
+ok(twoPulls.status === 1 && /comes from a repository other than/.test(twoPulls.out), "  nor where one of two pull requests with that head comes from another", twoPulls.out);
+const foreignAttached = attachedHere([aPull(LEGIT, null)]), unreadAttached = attachedHere(null);
+const inTheWay = out => out.split(/^Not read, /mu)[0];
+ok(/^attached: no, /u.test(foreignAttached.out) && /^- the sync: this head comes from a repository other than/mu.test(inTheWay(foreignAttached.out))
+  && !/^- the sync: /mu.test(inTheWay(unreadAttached.out)) && /^- the sync: whether this head comes from a branch of the repository could not be read/mu.test(unreadAttached.out),
+  "  and whether the core is attached runs nothing of the sync's there: a head from another is in the way, one gh says nothing of is not read", `${foreignAttached.out}\n${unreadAttached.out}`);
 {
   // (the core's side installs its own packages, never taking those that stand beside the copy, which a branch can
   // fill: each package's entry there, as the core's loader finds it, made to leave a mark where the side's pure-sync.mjs
@@ -199,14 +225,15 @@ ok(legitAttached.status === 0 && /^attached: /u.test(legitAttached.out) && !/^- 
 // the security-review check proves the sync pure itself, as GitHub runs its workflow on the sync's pull request (#99):
 // the default branch's pure-sync.mjs, in a clone of the head that checks nothing out, the token sent to the project's
 // own address alone; GitHub's API is a stand-in that gives the pull request and logs the status it is given
-const { env: reviewEnv, ghData, ghLog } = ghStandIn(env, tmp, origin);
-const reviewCheck = () => {
+const reviewCheck = from => {
   const sha = git(p, "rev-parse", "HEAD");
   git(p, "push", "-q", "-f", "origin", `${sha}:refs/pull/1/head`);
   const files = git(p, "diff", "--name-only", base, sha).split("\n").filter(Boolean).map(filename => ({ filename }));
-  const repo = { full_name: "someone/project" };
-  const pull = { number: 1, state: "open", draft: false, changed_files: files.length, commits: 1, head: { sha, repo }, base: { sha: base, repo: { ...repo, owner: { login: "someone" } } }, user: { login: "someone" } };
-  fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": pull, "issues/1/comments": [], "pulls/1/comments": [], "pulls/1/commits": [{ sha, parents: [{ sha: base }] }], "pulls/1/files": files }));
+  // (`from`: the head's repository as the host gives it, where the job started on an event that names none, as a
+  // comment's does; the event's own is the project's, as the job's condition asks of a pull request's event)
+  const pull = { number: 1, state: "open", draft: false, changed_files: files.length, commits: 1, head: { sha, repo: ours }, base: { sha: base, repo: { ...ours, owner: { login: "someone" } } }, user: { login: "someone" } };
+  const given = { ...pull, head: { sha, repo: from ?? ours } };
+  fs.writeFileSync(ghData, JSON.stringify({ "pulls/1$": given, "pulls\\?state=open": [given], "issues/1/comments": [], "pulls/1/comments": [], "pulls/1/commits": [{ sha, parents: [{ sha: base }] }], "pulls/1/files": files }));
   fs.writeFileSync(ghLog, "");
   const github = { event_name: "pull_request", repository: "someone/project", actor: "someone", server_url: "https://github.com", run_id: "1", token: "not-a-token",
     event: { action: "synchronize", pull_request: pull, repository: { default_branch: "main", private: false, full_name: "someone/project" } } };
@@ -215,8 +242,9 @@ const reviewCheck = () => {
     uses: { "actions/checkout": checkoutStandIn(env, tmp), "actions/setup-node": () => {} } });
   return { passed: job.passed, out: job.steps.map(x => x.out).join(""), posted: fs.readFileSync(ghLog, "utf8") };
 };
-const proved = reviewCheck();
+const proved = reviewCheck(), forked = reviewCheck({ full_name: "stranger/project", id: REPO_ID + 1 });
 ok(proved.passed && proved.out.includes("A pure sync, as pure-sync.mjs proves") && /"state": *"success"/.test(proved.posted) && proved.posted.includes("a pure sync, as pure-sync.mjs proves"), "the security-review check runs the proof itself: the sync passes with no review and no note", proved.out + proved.posted);
+ok(forked.passed && forked.out.includes("Not proved a pure sync") && /"state": *"pending"/.test(forked.posted), "  though not where the pull request's head comes from another repository (own-head.mjs)", `${forked.passed}\n${forked.posted}\n${forked.out}`);
 write(p, "core/README.md", `${read(p, "core/README.md")}more\n`);
 git(p, "commit", "-q", "-am", "core/ edited");
 const unproved = reviewCheck();
@@ -314,16 +342,14 @@ git(p, "checkout", "-q", LEGIT, "--", ".");
 git(p, "commit", "-q", "-m", "the sync, the core's part written again");
 const mends = pure();
 ok(mends.status === 0 && read(p, "AGENTS.md").includes("@core/roles/builder.md\n"), "a sync that writes the core's part of a rule file again, as the process does, is pure, proved against the kit's render", mends.out);
-const silent = path.join(tmp, "gh-silent");
-fs.mkdirSync(silent, { recursive: true });
-fs.writeFileSync(path.join(silent, "gh"), "#!/bin/sh\necho 'gh: not signed in' >&2\nexit 1\n", { mode: 0o755 });
 // (the read with no sign-in sent to a proxy that is not there, so it gives no answer and nothing leaves this machine;
 // a stranger's repository of the stand-in's name never answers for it; #1246)
 const offline = { HTTPS_PROXY: "http://127.0.0.1:9", https_proxy: "http://127.0.0.1:9", NO_PROXY: "", no_proxy: "" };
 const unanswered = (given, ...args) => {
   git(p, "remote", "set-url", "origin", GH_ORIGIN);
+  opens(); // (gh's stand-in gives the head's pull request alone, and nothing of the repository)
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...env, ...offline, ...given, [PATHKEY]: `${silent}${path.delimiter}${env[PATHKEY]}` }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs"), ...args], { cwd: p, env: { ...reviewEnv, ...offline, ...given }, encoding: "utf8" });
     return `${r.status}\n${r.stdout}${r.stderr}`;
   } finally { git(p, "remote", "set-url", "origin", origin); }
 };

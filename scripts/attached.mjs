@@ -10,7 +10,8 @@
 // read nothing here, it says, counted neither way. It
 // reports and fails nothing (core-changes/projects.md of the core, "Nothing locks a project"), and each part keeps its own check where
 // it stands. The sync prints its line at its end (sync.mjs, beside this file). Reads only, and writes nothing in the
-// project. Git, tar, gh where pure-sync.mjs asks whose account holds the repository, and
+// project. On a sync's branch whose head is not shown to come from the project's own repository (own-head.mjs), it
+// runs nothing of the sync's. Git, tar, gh where it and pure-sync.mjs ask of the head and whose account holds the repository, and
 // Node's own modules.
 //
 //   node core/scripts/attached.mjs                    from a project's root: the line, then what stands in the way
@@ -27,6 +28,7 @@ import { MANIFEST, readCore } from "./core-path.mjs";
 import { BLOCKS } from "./core-owned.mjs";
 import { differences, fresh, kind } from "./fresh.mjs";
 import { projectNotes } from "./manifest-reads.mjs";
+import { headFrom } from "./own-head.mjs";
 import { saidOf } from "./read-nothing.mjs";
 import { fetchCore, followsOf, hostSaid, inBare, past, releasesIn, untar } from "./releases.mjs";
 import { started } from "./started.mjs";
@@ -174,6 +176,9 @@ function unpack(bare, side, dir) {
 function pureSync(root, at, bare, why, tmp, said) {
   const sync = syncBranch(root);
   if (!sync) return;
+  // (a head shown to come from the repository itself, before the core's side is unpacked or anything run: own-head.mjs)
+  const seen = headFrom(git(root, ["rev-parse", "HEAD"]), root);
+  if (!seen.own) return seen.foreign ? said.way("the sync", seen.why) : said.unread("the sync", seen.why);
   if (!bare) return said.unread("the sync", `the core could not be fetched${why}, so pure-sync.mjs was not run from the core's side`);
   const side = sideOf(root, at, bare, sync, said);
   if (!side) return;
