@@ -35,8 +35,10 @@ const tmp = scratchDir("pure-sync-test-");
 const slash = p => p.replace(/\\/g, "/");
 const theCore = path.join(tmp, "the-core"), coreRepo = path.join(theCore, ".git"); // (copy-tree.mjs takes the git folder)
 // (the test's own programs, git first, are never looked for in the folder they start in, as Windows would by default:
-// a case below plants a program there; what the scripts under test are given leaves this out, so each must say it itself)
-const env = { ...scratchEnv(theCore, tmp), NoDefaultCurrentDirectoryInExePath: "1" };
+// a case below plants a program there. Node reads this from its own process, never from what a child is given; what
+// the scripts under test are given there leaves it out, so each must say it itself)
+process.env.NoDefaultCurrentDirectoryInExePath = "1";
+const env = scratchEnv(theCore, tmp);
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 1 << 28 }).trim();
 const node = (dir, ...args) => { const r = spawnSync(process.execPath, args, { cwd: dir, env, encoding: "utf8" }); return { status: r.status, out: `${r.stdout}${r.stderr}` }; };
 const write = (dir, f, text) => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), text); };
