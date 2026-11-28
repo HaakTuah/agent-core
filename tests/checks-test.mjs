@@ -206,7 +206,8 @@ if (process.platform !== "win32") {
   fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh
 for a in "$@"; do case "$a" in -p:RestorePackagesPath=*) to=\${a#-p:RestorePackagesPath=};; ./*) project=$a;; esac; done
 [ -n "$to" ] || exit 0
-mkdir -p "$to/some.pkg/1.0.0"; echo "ran dotnet restore $project, folders standing: $(ls -d "$(dirname "$to")"/nuget-packages-* | wc -l)"
+own=$(dirname "$to"); caches=own; for c in "$NUGET_HTTP_CACHE_PATH" "$NUGET_PLUGINS_CACHE_PATH" "$NUGET_SCRATCH"; do case "$c" in "$own"/*) ;; *) caches=shared;; esac; done
+mkdir -p "$to/some.pkg/1.0.0"; echo "ran dotnet restore $project, folders standing: $(ls -d "$(dirname "$own")"/nuget-restore-* | wc -l), caches $caches"
 case "$project" in *"$FAIL_RESTORE"*) [ -n "$FAIL_RESTORE" ] && exit 1;; esac; exit 0
 `, { mode: 0o755 });
   fs.writeFileSync(path.join(dir, "core/scripts/nuget.mjs"), `import fs from "node:fs";
@@ -220,7 +221,7 @@ if (args.includes("--restored") && process.env.FAIL_READ && args.join(" ").inclu
     fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), `echo "run=true" >> "$GITHUB_OUTPUT"\necho "built=${built}" >> "$GITHUB_OUTPUT"\n`);
     const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}` });
     const after = r.out.indexOf("ran dotnet restore"), runs = [...r.out.matchAll(/^ran nuget\.mjs \[checks\/licences\.json --packages (.*)\]/gm)];
-    const before = runs.filter(m => m.index < after), reads = runs.filter(m => m.index > after), restores = [...r.out.matchAll(/^ran dotnet restore (\S+), folders standing: +(\d+)$/gm)];
+    const before = runs.filter(m => m.index < after), reads = runs.filter(m => m.index > after), restores = [...r.out.matchAll(/^ran dotnet restore (\S+), folders standing: +(\d+), caches own$/gm)];
     ok(r.status === 0 && before.length === 1 && before.every(m => / --fetched$/.test(m[1])) && restores.map(m => m[1]).join() === "./src/A/A.csproj,./src/B/B.csproj"
       && reads.length === 2 && reads.every((m, i) => m.index > restores[i].index && (!restores[i + 1] || m.index < restores[i + 1].index) && m[1].endsWith(` --restored --lock src/${"AB"[i]}/packages.lock.json`)),
       `nuget: whatever the look says it ran (built=${built}), the read before the restore runs, and each project's restore is read at once, given --restored and its lock file`, r.out);
@@ -229,9 +230,9 @@ if (args.includes("--restored") && process.env.FAIL_READ && args.join(" ").inclu
   // where the first one's read failed)
   for (const [what, extra] of [["each passed", {}], ["the first restore failed", { FAIL_RESTORE: "src/A/" }], ["the first read failed", { FAIL_READ: "src/A/" }]]) {
     const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}`, ...extra });
-    const standing = [...r.out.matchAll(/^ran dotnet restore (\S+), folders standing: +(\d+)$/gm)].map(m => Number(m[2]));
+    const standing = [...r.out.matchAll(/^ran dotnet restore (\S+), folders standing: +(\d+), caches own$/gm)].map(m => Number(m[2]));
     ok(standing.length === 2 && standing.every(n => n === 1) && r.status === (what === "each passed" ? 0 : 1),
-      `nuget: as each project restores, only its own folder of packages stands (${what})`, r.out);
+      `nuget: as each project restores, only its own folder of packages, with NuGet's caches and scratch folder inside it, stands (${what})`, r.out);
   }
 }
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,

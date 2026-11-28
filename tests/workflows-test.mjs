@@ -643,6 +643,11 @@ exit 1
   const looked = [["licences.yml", "Every package and audit entry"], ["tests.yml", "Each package new to the core's own lock file"]]
     .filter(([file, name]) => !String(at(file, name).env?.LOOKUP_BASE).includes("'HEAD^1'"));
   ok(looked.length === 0, "the lookup's steps name HEAD^1 as LOOKUP_BASE on a pull request", looked.join("; "));
+  // (in core.yml's one job, the NuGet check runs on a checkout holding only what git knows: every file the steps before
+  // wrote there is taken out before its script runs, and no step follows it)
+  const coreSteps = steps.filter((s) => s.file === "core.yml"), nugetRun = String(at("core.yml", "The NuGet check, last").run ?? "");
+  const cleaned = /^\s*git clean -ffdxq?\s*$/mu.exec(nugetRun), runsAt = nugetRun.indexOf("scripts/checks.mjs");
+  ok(cleaned && cleaned.index < runsAt && coreSteps.at(-1)?.step.name === "The NuGet check, last", "core.yml's NuGet step takes every file git does not know out of the checkout before its check runs, and is the job's last", nugetRun);
 }
 
 // (#1311: a job's own limit cancels the whole job, which skips the steps after it; so the daily look's step has a limit

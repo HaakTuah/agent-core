@@ -329,7 +329,7 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      file NuGet reads by name, so no other bills a job), with the licence check's config: first `lookup.mjs --nuget`,
      which asks NuGet's registry of each package new to the lock files as the licence check asks npm's (floor topic 15);
      then a restore of each project file git knows from its lock file alone (`dotnet restore --locked-mode`, floor rule
-     15), each into a folder of its own that is read and taken out before the next project's restore, taking packages
+     15), each into a folder of its own, NuGet's caches inside it, that is read and taken out before the next project's restore, taking packages
      from NuGet's own registry and from what the config's "nuget.sources" names, whatever a NuGet.Config says (floor
      rule 7), each read by `nuget.mjs`, which reads
      from NuGet's own record beside each package that it was taken from nowhere else, and holds every package in those
@@ -351,8 +351,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
      with a tool the pull request's base held, never read before this release, is reported, not failed). That read runs
      before every restore of the check's, and reads the project's files as committed: a target, a task, a download or
-     an SDK from a package, an Import it cannot follow, a global.json's setting beyond the SDK's version, or a program,
-     fails there unless the base held it in the same file or the config's "nuget.unread" declares it as the failure
+     an SDK from a package, a setting that turns how the restore runs, an Import it cannot follow, a global.json's
+     setting beyond the SDK's version, or a program (by its first bytes, or a file git records as one that runs), fails there unless the base held it in the same file or the config's "nuget.unread" declares it as the failure
      prints it, for the reviews to read what it brings in.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,

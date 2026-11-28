@@ -1,7 +1,7 @@
 # The NuGet check (floor rules 7, 10 and 15), for a project whose packages come from NuGet (.NET): on every pull
 # request, Dependabot's included, it restores each project file git knows from its lock file alone, with the .NET SDK
 # the runner holds (`dotnet restore --locked-mode`, NuGet's own tool, which fails where a lock file is not what the
-# project file asks for, and holds each package to the hash its lock file names), each into a folder of its own; and
+# project file asks for, and holds each package to the hash its lock file names), each into a folder of its own, NuGet's caches inside it; and
 # after each project's restore, before the next's, runs the caller's own core/scripts/nuget.mjs on that folder (with
 # --restored and the project's lock file), which holds every package in the lock files, and whatever else the restore
 # brought, to its licence list, and what a lock file names to one exact version, reading each licence from the
@@ -20,8 +20,8 @@
 # of dotnet's names (dotnet-tools.json, in .config/ or any folder), holds each package to its lock file's content hash
 # and reads each licence from its own file (core/scripts/nuget-fetch.mjs, then nuget.mjs with --fetched; core archive
 # 201), and the project's files as committed, failing a form in one that it does not read (a target, a task, a
-# download or an SDK from a package, an Import it cannot follow, a global.json's setting beyond the SDK's version, a
-# program) unless the base held it or the config declares it: a verdict no build the pull request changed has run
+# download or an SDK from a package, a setting that turns how the restore runs, an Import it cannot follow, a
+# global.json's setting beyond the SDK's version, a program, by its first bytes or as git records it) unless the base held it or the config declares it: a verdict no build the pull request changed has run
 # beside (the first look below runs a build only where nothing it reads changed from the base, and so runs the base's
 # build files, which may run what else the pull request changed, gaining nothing the read judges); after the restore
 # the script reads nothing of git's for the base (nuget.mjs with --restored), since the restore could have rewritten

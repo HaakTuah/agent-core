@@ -706,6 +706,8 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   ok(first.failures.length === 0 && whole.failures.some(x => x.startsWith("Weak.Copy@2.1.0") && x.includes("not in the restore's folder")), "read for one project's restore, a package only another's lock file names is left to that one's read, where a read of the whole fails it", JSON.stringify({ first, whole }));
   ok(second.failures.length === 1 && second.failures[0].startsWith(`Weak.Copy@2.1.0 (${T}): its manifest is not in the restore's folder`), "and one its own lock file names must stand in its folder", JSON.stringify(second));
   ok(other.failures.some(x => x.startsWith("src/Other/packages.lock.json, the lock file this read is for, is none the config names. Mend: ")), "a lock file the config does not name fails", JSON.stringify(other));
+  const rsp = [...TRACKED, "Directory.Build.rsp"], tree = (lockFile) => check(cfg, tmp, restore("Newtonsoft.Json@13.0.3"), rsp, process.env, { restored: true, lock: lockFile }).failures.filter(x => x.startsWith("Directory.Build.rsp"));
+  ok(tree(null).length === 1 && tree(L).length === 0 && tree(T).length === 0, "what the tree alone fails is said by a read of the whole, and by no read for one project's restore", JSON.stringify([tree(null), tree(L)]));
   const bare = spawnSync(process.execPath, [path.join(here, "nuget.mjs"), "checks/licences.json", "--packages", "x", "--lock", L], { cwd: tmp, encoding: "utf8" });
   ok(bare.status === 1 && heard(bare.stdout + bare.stderr).includes("--lock was given without --restored"), "--lock without --restored is refused, saying its mend", bare.stdout + bare.stderr);
 }
@@ -719,6 +721,8 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   ok(forms.length === 8 && forms[0] === '<PackageDownload Include="B" Version="[1.0.0]" />' && forms[1] === '<packagedownload Include="C"><Version>[2.0.0]</Version></packagedownload>' && forms[4].startsWith('<Target Name="Hook"') && forms[4].endsWith("</CreateItem></Target>") && forms[5].endsWith("]]></Task></UsingTask>")
     && forms[6] === '<Import Project="Sdk.props" Sdk="S" Version="1.0.0" />' && forms[7] === '<Sdk Name="E" Version="2.0.0" />' && !forms.some(x => x.includes("Old") || x.includes("PackageReference") || x.includes("Microsoft.NET.Sdk")),
     "a download, a pack named, a tool, a target and a task are read whole, an end tag in a comment or CDATA no end, and an SDK with a version by its tag; a package reference, an SDK of the SDK's own and a comment are none", JSON.stringify(forms));
+  ok(formsIn(`<Project><PropertyGroup><RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation><nugetconsoleprocessfilename>$(X)</nugetconsoleprocessfilename><RestoreSources>x</RestoreSources></PropertyGroup></Project>`).join("|")
+    === "<RestoreUseStaticGraphEvaluation>true</RestoreUseStaticGraphEvaluation>|<nugetconsoleprocessfilename>$(X)</nugetconsoleprocessfilename>", "the settings that turn the restore to the way that starts a process a property names are each read whole, whatever their value or case");
   ok(formsIn(`<Project Sdk="Microsoft.NET.Sdk;My.Sdk/1.0.0">`).length === 1 && formsIn(`<Project><Target Name="T"><Exec Command="x" />`).join() === '<Target Name="T"><Exec Command="x" />' && formsIn(`<Project><Target Name="A"><Target Name="B" /></Target><Target Name="C" /></Project>`).length === 2,
     "a project's SDK from a package is one, a target with no end is read to the file's, and one inside another is part of it");
   ok(formsIn(`<Project><ItemGroup><_PackageToDownload Include="P" Version="1.0.0" /></ItemGroup><Import Project="Sdk.props" Sdk="S" MinimumVersion="1.0" /></Project>`).length === 2, "an item the SDK downloads by, and an Import of an SDK by its least version, are forms");
@@ -750,7 +754,7 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   // (each form's line, as its failure prints it, which declares it)
   const first = r, lineOf = (text) => first.failures.map(x => /as this line prints it \((.*)\), for the reviews/.exec(x)?.[1]).find(l => l?.startsWith(text));
   ok(r.failures.some(x => x.startsWith(`${DBP} holds what the read before the restore does not follow`) && x.includes(DOWNLOAD) && x.includes('"nuget.unread"')) && r.failures.some(x => x.startsWith(`${DBP} imports $(Elsewhere)/more.props, a file whose path this check cannot know without the build`))
-    && r.failures.some(x => x.startsWith('global.json holds what the read before the restore does not read') && x.includes('msbuild-sdks: {"My.Sdk":"1.0.0"}')) && /^<PackageDownload Include="Some.Pkg" Version="\[1\.0\.0\]" \/> \(its text's sha256 [0-9a-f]{16}\)$/.test(lineOf("<PackageDownload")),
+    && r.failures.some(x => x.startsWith('global.json holds what the read before the restore does not read') && x.includes('msbuild-sdks: {"My.Sdk":"1.0.0"}')) && /^<PackageDownload Include="Some.Pkg" Version="\[1\.0\.0\]" \/> \(its text's sha256 [0-9a-f]{64}\)$/.test(lineOf("<PackageDownload")),
     "a download, an Import the check cannot follow and an SDK from a package that the pull request adds each fail, saying the line that declares it", JSON.stringify(r));
   r = formCheck(null, null);
   ok(r.failures.length === 0 && r.reports.filter(x => x.includes("(reported, and passes)")).length >= 3, "with no base, each is reported and passes", JSON.stringify(r));
@@ -802,6 +806,24 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   inRepo(DLL, dll(3));
   fails = programCheck();
   ok(fails.length === 1 && fails[0].startsWith(`${DLL} is a program`), "and other bytes at its path fail", JSON.stringify(fails));
+  // (a program past the bound the check reads files to: by its bytes' hash all the same, hashed as it is read; and a
+  // file that runs though no first bytes call it a program, a script that starts "#!" or one git records as 100755)
+  const BIG = "tools/Big.dll", SCRIPT = "tools/run.sh", RUNS = "tools/runs", big = (n) => Buffer.concat([dll(n), Buffer.alloc((1 << 24) + 1, n)]);
+  inRepo(DLL, dll(1)); inRepo(BIG, big(4)); inRepo(SCRIPT, "#!/bin/sh\necho one\n"); inRepo(RUNS, "echo one\n"); fs.chmodSync(path.join(repo, RUNS), 0o755); git("add", RUNS);
+  const runsCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, BIG, SCRIPT, RUNS], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
+  fails = runsCheck();
+  ok(fails.length === 3 && [BIG, SCRIPT, RUNS].every(f => fails.some(x => new RegExp(`^${f.replace(".", "\\.")} is a program, its bytes' sha256 [0-9a-f]{64}, which a restore may be made to load or start`).test(x))),
+    "a program past the bound the check reads to, a script that starts \"#!\" and a file git records as one that runs each fail where the pull request adds it", JSON.stringify(fails));
+  git("add", "-A"); git("commit", "-q", "-m", "programs that run");
+  const runsListed = run("--imports").stdout.split("\n");
+  ok(runsCheck().length === 0 && [BIG, SCRIPT, RUNS].every(f => runsListed.includes(f)), "the first look lists each, and each as the base held it passes", JSON.stringify(runsCheck()));
+  inRepo(BIG, big(5)); inRepo(SCRIPT, "#!/bin/sh\necho two\n"); inRepo(RUNS, "echo two\n");
+  fails = runsCheck();
+  ok(fails.length === 3, "and other bytes at each path fail, the large program's too", JSON.stringify(fails));
+  inRepo(BIG, big(4)); inRepo(SCRIPT, "#!/bin/sh\necho one\n"); inRepo(RUNS, "echo one\n"); inRepo("tools/plain", "echo one\n"); git("add", "-A"); git("commit", "-q", "-m", "a plain file");
+  fs.chmodSync(path.join(repo, "tools/plain"), 0o755); git("add", "tools/plain");
+  fails = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, BIG, SCRIPT, RUNS, "tools/plain"], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
+  ok(fails.length === 1 && fails[0].startsWith("tools/plain is a program"), "a file the base held as one that does not run, which the pull request makes one that does, fails though its bytes are the same", JSON.stringify(fails));
   fs.rmSync(path.join(repo, "tools"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no programs");
   inRepo(DBP, `<Project><!DOCTYPE p><X /></Project>`);
   inRepo("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "x">]><Project />`);
@@ -852,7 +874,7 @@ if (process.platform !== "win32") {
   const held = merged("other-file", () => inRepo("README.md", "another change\n"));
   ok(held.status === 0 && held.out.includes(`REPORT: ${CS} holds what the read before the restore does not follow`) && held.out.includes("held before this check read it"), "on a merge, a target the base held, beside a change to another file, passes reported", held.out);
   const added = merged("new-target", () => inRepo(CS, `<Project Sdk="Microsoft.NET.Sdk">${gen}<Target Name="More" AfterTargets="Build" /></Project>`));
-  ok(added.status === 1 && /<Target Name="More" AfterTargets="Build" \/> \(its text's sha256 [0-9a-f]{16}\)\. Mend: /.test(added.out), "and a target the pull request adds beside it fails, saying its mend", added.out);
+  ok(added.status === 1 && /<Target Name="More" AfterTargets="Build" \/> \(its text's sha256 [0-9a-f]{64}\)\. Mend: /.test(added.out), "and a target the pull request adds beside it fails, saying its mend", added.out);
 }
 ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);

@@ -345,21 +345,24 @@ const RUN = {
 };
 
 // Each project file restored from its lock file alone into a folder of its own and read at once (readAfter, with
-// --restored and its lock file), before the next project's restore; the folder taken out before that restore starts,
-// whatever the restore or the read did, so that no project's restore runs beside what another's brought: whether every
-// restore passed, each read's verdict and whether any restored written to `each`.
+// --restored and its lock file), before the next project's restore; the folder, with NuGet's caches of downloads and
+// plug-ins and its scratch folder beside it, taken out before that restore starts, whatever the restore or the read
+// did, so that no project's restore runs beside anything another's wrote: whether every restore passed, each read's
+// verdict and whether any restored written to `each`.
 function restoreEach(named, from, { temp, dotnet, readAfter, each }) {
   let restored = true;
   for (const project of named) {
-    const packages = fs.mkdtempSync(path.join(temp, "nuget-packages-"));
+    const own = fs.mkdtempSync(path.join(temp, "nuget-restore-")), packages = path.join(own, "packages");
+    const caches = { NUGET_PACKAGES: packages, NUGET_HTTP_CACHE_PATH: path.join(own, "http-cache"), NUGET_PLUGINS_CACHE_PATH: path.join(own, "plugins-cache"), NUGET_SCRATCH: path.join(own, "scratch") };
     try {
+      fs.mkdirSync(packages);
       // (the two properties given here overrule a project's own: its packages go to the folder the check reads, and its
       // lock file is the one beside it; each project named from the root, behind "./", so no name reads as an option)
-      if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) { restored = false; continue; }
+      if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { ...caches, ...dotnet } })) { restored = false; continue; }
       each.restoredAny = true;
       console.log(`-- What the restore of ${asText(project)} brought, read before the next restore`);
       if (!readAfter(packages, path.posix.join(path.posix.dirname(project), "packages.lock.json"))) each.reads = false;
-    } finally { fs.rmSync(packages, { recursive: true, force: true }); }
+    } finally { fs.rmSync(own, { recursive: true, force: true }); }
   }
   return restored;
 }

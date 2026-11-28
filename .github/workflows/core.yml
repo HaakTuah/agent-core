@@ -25,7 +25,7 @@
 # project the host's CodeQL does not scan follows them, with any of those inputs and none of its own, its engine
 # installed from the core's .packages/requirements.txt by its hashes in a step before it (scripts/code-scan.mjs; #546, #654); the
 # package checks go last, each in a step of its own, and the NuGet check, which runs the pull request's build files,
-# after all.
+# after all, on a checkout from which it first takes every file git does not know.
 # One job bills one runner's minutes where four or five did (#377); with no such input it runs its own check alone, as
 # before.
 name: core
@@ -424,5 +424,9 @@ jobs:
           CONFIG: ${{ inputs.nuget }}
           ADVISORY: ${{ inputs.advisory }}
         run: |
+          # (every file git does not know that the steps before wrote in the checkout taken out first, the packages they
+          # installed from the pull request's lock files among them, so the restore finds there what git knows alone, as
+          # in nuget.yml's job of its own; the check's scripts need none of the core's packages, and no step follows)
+          git clean -ffdxq
           set -- nuget --nuget "$CONFIG" --base "$BASE"; [ "$ADVISORY" != true ] || set -- "$@" --advisory
           node "$CORE_AT"scripts/checks.mjs "$@"
