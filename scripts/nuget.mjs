@@ -1202,15 +1202,16 @@ function auditEntries(config, root) {
 }
 
 // (one package, `k` its id@version: its source and its licence, held to its list, an audit entry or the owner's yes)
+// (whether a package not in the folder read is another read's: before the restore, one the fetch could not reach,
+// read after it, as the fetch said; read for one project's restore, one only another's lock file names, read where
+// that one is restored)
+const readElsewhere = (c, p, manifest) => (c.fetched || (c.lock !== null && !p.locks?.has(c.lock))) && (!c.packagesDir || !existsSync(manifest));
 function judge(c, k, p) {
   const { config, packagesDir, failures } = c;
   const name = `${p.id}@${p.version}`, list = p.shipped ? "the list for what ships" : "the tools' list";
   const where = p.lock ?? "brought by the restore, and named in no lock file read here";
   const manifest = join(packagesDir ?? "", p.id.toLowerCase(), p.version.toLowerCase(), `${p.id.toLowerCase()}.nuspec`);
-  // (before the restore, one the fetch could not reach is read after it: the fetch said so)
-  if (c.fetched && (!packagesDir || !existsSync(manifest))) { c.used.add(k); c.read.add(k); return; }
-  // (read for one project's restore, a package only another's lock file names is read where that one is restored)
-  if (c.lock !== null && !p.locks?.has(c.lock) && !existsSync(manifest)) { c.used.add(k); c.read.add(k); return; }
+  if (readElsewhere(c, p, manifest)) { c.used.add(k); c.read.add(k); return; }
   if (!packagesDir || !existsSync(manifest)) { failures.push(`${name} (${where}): its manifest is not in the restore's folder, so its licence cannot be read. Mend: restore from the lock files first (dotnet restore --locked-mode), then run the check`); return; }
   takenFaults(c, name, where, manifest);
   const text = regularText(manifest, { bound: BOUND });

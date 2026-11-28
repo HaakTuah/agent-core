@@ -309,10 +309,8 @@ const RUN = {
       const got = node(coreAt, "nuget-fetch.mjs", [o.nuget, "--into", fetched]);
       return verdict(node(coreAt, "nuget.mjs", [o.nuget, "--packages", fetched, "--fetched", ...advisory]) && got);
     })) return;
-    // (each project restored into a folder of its own and read at once, with --restored, before the next project's
-    // restore; the folder taken out before that restore starts, whatever the restore or the read did, so that no
-    // project's restore runs beside what another's brought; the reads' verdict is the next check's)
-    let reads = true, restoredAny = false;
+    // (the reads after each project's restore, their verdict the next check's)
+    const each = { reads: true, restoredAny: false };
     const readAfter = (folder, lock) => node(coreAt, "nuget.mjs", [o.nuget, "--packages", folder, "--restored", ...(lock ? ["--lock", lock] : []), ...advisory], { env: { NUGET_PACKAGES: folder } });
     if (!check("Restore each project file from its lock file alone", () => {
       // (the project files git knows, and where packages come from, each a line as the script lists them, the registry
@@ -331,17 +329,7 @@ const RUN = {
         lacking.add(SDK_BAND); starts.lacked++; passed = false;
       } else if (passed) {
         const from = sources.stdout.split(/\r?\n/).filter(Boolean).flatMap(s => ["--source", s]);
-        for (const project of named) {
-          const packages = fs.mkdtempSync(path.join(temp, "nuget-packages-"));
-          try {
-            // (the two properties given here overrule a project's own: its packages go to the folder the check reads, and
-            // its lock file is the one beside it; each project named from the root, behind "./", so no name reads as an option)
-            if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) { passed = restored = false; continue; }
-            restoredAny = true;
-            console.log(`-- What the restore of ${asText(project)} brought, read before the next restore`);
-            if (!readAfter(packages, path.posix.join(path.posix.dirname(project), "packages.lock.json"))) reads = false;
-          } finally { fs.rmSync(packages, { recursive: true, force: true }); }
-        }
+        if (!restoreEach(named, from, { temp, dotnet, readAfter, each })) passed = restored = false;
       }
       if ((sources.status !== 0 || !restored) && !lacking.has("dotnet")) console.log(`FAIL A restore from a lock file failed (dotnet's errors above): the lock file is not what the project file asks for, a package is not what its lock file names or comes from no source named here (floor rules 7 and 15), or the config names its sources wrongly. ${MEND}where the project file changed, write its lock file anew (dotnet restore --force-evaluate) and commit it, never to take in a package whose content differs from what its lock file names; take out a package no source named in the config serves; or correct the config's sources.`);
       return verdict(passed);
@@ -349,12 +337,32 @@ const RUN = {
     // (after the restore, nothing of git's is read for the base, which the restore could have rewritten: each comparison
     // with it was made before, by the read above; with no project to restore, one read of an empty folder)
     check("Every package one exact version, and under a licence on its list", () => {
-      if (restoredAny) return reads;
+      if (each.restoredAny) return each.reads;
       const empty = fs.mkdtempSync(path.join(temp, "nuget-packages-"));
       try { return readAfter(empty, null); } finally { fs.rmSync(empty, { recursive: true, force: true }); }
     });
   },
 };
+
+// Each project file restored from its lock file alone into a folder of its own and read at once (readAfter, with
+// --restored and its lock file), before the next project's restore; the folder taken out before that restore starts,
+// whatever the restore or the read did, so that no project's restore runs beside what another's brought: whether every
+// restore passed, each read's verdict and whether any restored written to `each`.
+function restoreEach(named, from, { temp, dotnet, readAfter, each }) {
+  let restored = true;
+  for (const project of named) {
+    const packages = fs.mkdtempSync(path.join(temp, "nuget-packages-"));
+    try {
+      // (the two properties given here overrule a project's own: its packages go to the folder the check reads, and its
+      // lock file is the one beside it; each project named from the root, behind "./", so no name reads as an option)
+      if (!run("dotnet", ["restore", "--locked-mode", ...from, `-p:RestorePackagesPath=${packages}`, "-p:NuGetLockFilePath=", `./${project}`], { env: { NUGET_PACKAGES: packages, ...dotnet } })) { restored = false; continue; }
+      each.restoredAny = true;
+      console.log(`-- What the restore of ${asText(project)} brought, read before the next restore`);
+      if (!readAfter(packages, path.posix.join(path.posix.dirname(project), "packages.lock.json"))) each.reads = false;
+    } finally { fs.rmSync(packages, { recursive: true, force: true }); }
+  }
+  return restored;
+}
 
 // The calling workflow, by its own path, where the run says it (CALLER, GitHub's workflow_ref): a change to it is one the
 // package check reads.
