@@ -19,12 +19,12 @@ const id = repo => (Number.isSafeInteger(repo?.id) && repo.id > 0 ? repo.id : nu
 export function headFrom(sha, cwd, ask = gh) {
   let origin = "";
   try { origin = execFileSync("git", ["config", "--get", "remote.origin.url"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { /* (no origin) */ }
-  const repo = repoOf(origin), unread = why => ({ own: false, foreign: false, why: `whether this head comes from a branch of the repository could not be read: ${why}, so nothing was run` });
-  if (!repo) return unread(`the clone's origin names no repository on github.com. ${MEND}, in a clone whose origin is the repository's address there`);
-  const { pulls, why } = openPulls(repo, ask);
-  if (!pulls) return unread(why);
+  const repo = repoOf(origin), unread = (why, mend = MEND) => ({ own: false, foreign: false, why: `whether this head comes from a branch of the repository could not be read: ${why}, so nothing was run. ${mend}` });
+  if (!repo) return unread("the clone's origin names no repository on github.com", `${MEND}, in a clone whose origin is the repository's address there`);
+  const { pulls, why, mend } = openPulls(repo, ask);
+  if (!pulls) return unread(why, mend);
   const its = pulls.filter(p => p.head.sha === sha);
-  if (!its.length) return unread(`no open pull request of ${repo} has this head. ${MEND}`);
+  if (!its.length) return unread(`no open pull request of ${repo} has this head`);
   if (!its.every(whole)) return unread(`GitHub's answer for a pull request of ${repo} with this head lacks its head's or its base's repository`);
   const other = its.find(p => id(p.head.repo) !== id(p.base.repo));
   if (!other) return { own: true };
@@ -35,11 +35,11 @@ export function headFrom(sha, cwd, ask = gh) {
 // (a pull request whose head's and base's repositories GitHub gave, the head's null where its fork was deleted)
 const whole = p => "repo" in p.head && (p.head.repo === null || id(p.head.repo) !== null) && id(p.base?.repo) !== null;
 
-// { pulls }, the repository's open pull requests as gh gives them, each with its head's commit, or { why } none is.
+// { pulls }, the repository's open pull requests as gh gives them, each with its head's commit, or { why, mend } none is.
 function openPulls(repo, ask) {
   let pages;
   try { pages = parseBounded(ask(["api", "--hostname=github.com", "--paginate", "--slurp", `repos/${repo}/pulls?state=open&per_page=100`])); }
-  catch (e) { return { why: `gh gave no answer for ${repo}'s open pull requests (${String(e.stderr || e.message).trim().split("\n")[0].slice(0, 120)}). Mend: run it again where gh is signed in for an account that can read them` }; }
+  catch (e) { return { why: `gh gave no answer for ${repo}'s open pull requests (${String(e.stderr || e.message).trim().split("\n")[0].slice(0, 120)})`, mend: "Mend: run it again where gh is signed in for an account that can read them" }; }
   const pulls = Array.isArray(pages) && pages.every(Array.isArray) ? pages.flat() : null;
   return pulls?.every(p => typeof p?.head?.sha === "string") ? { pulls } : { why: `GitHub's list of ${repo}'s open pull requests lacks a field it always gives` };
 }

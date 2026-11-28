@@ -557,7 +557,7 @@ const inLone = (...args) => { const r = spawnSync(process.execPath, [path.join(t
 const loneTried = inLone("--trial", C), loneGate = inLone();
 ok(loneTried.status === 1 && answer(loneTried.out)?.commit === C && answer(loneTried.out)?.from === "release-1" && answer(loneTried.out)?.main === "clone" && /^read against the clone's own branch main, as the clone has no origin/mu.test(loneTried.out) && !loneTried.out.includes("NOT PURE") && !loneTried.out.includes("sha="),
   "  a trial's clone with no origin gives its reading, read against the clone's own main, which it names", loneTried.out);
-ok(loneGate.status === 1 && loneGate.out.includes("NOT PURE the clone has no origin to fetch the project's main from") && loneGate.out.includes("Mend: run it in a clone of the project's repository whose origin") && !loneGate.out.includes("sha="),
+ok(loneGate.status === 1 && loneGate.out.includes("NOT PURE whether this head comes from a branch of the repository could not be read: the clone's origin names no repository on github.com, so nothing was run. Mend: ") && loneGate.out.includes("in a clone whose origin is the repository's address there") && !loneGate.out.includes("sha="),
   "  and the merge's gate there says it is not proved, with its mend, never a head to merge", loneGate.out);
 git(lone, "branch", "-q", "-D", "main");
 const mainless = inLone("--trial", C);

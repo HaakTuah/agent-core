@@ -61,17 +61,14 @@ const seen = tried ? null : headFrom(head, process.cwd());
 if (seen && !seen.own) { fail.push(seen.why); done("unknown"); }
 // (the project's main, fetched from its origin; a release's trial on a clone that has no origin reads the clone's own
 // main instead, its reading proving no merge, while the merge's gate, which waives the reviews, takes main from the
-// origin alone and, with none, gives its reading that it is not proved; #1361, point 15)
+// origin alone, and where the clone names none stopped above, the head not shown to be the project's; #1361, point 15)
 const hasOrigin = (() => { try { raw(["remote", "get-url", "origin"]); return true; } catch { return false; } })();
 let mainRef = "FETCH_HEAD", givenPrivate = false;
 if (hasOrigin) git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
-else if (tried) mainRef = "refs/heads/main";
-else mainRef = null;
-const base = (() => { try { return mainRef && git(["merge-base", mainRef, head]); } catch { return null; } })();
+else mainRef = "refs/heads/main";
+const base = (() => { try { return git(["merge-base", mainRef, head]); } catch { return null; } })();
 if (!base) {
-  const why = mainRef === null
-    ? "the clone has no origin to fetch the project's main from, so the sync is not proved against it. Mend: run it in a clone of the project's repository whose origin is its address on the host, with the sync's branch checked out"
-    : `the project's main (${mainRef === "FETCH_HEAD" ? "fetched from the origin" : "the clone's own branch main, as the clone has no origin"}) shares no commit with the sync's branch, so the sync is not proved against it. Mend: run it in a clone that holds the project's main${mainRef === "FETCH_HEAD" ? "" : " as its branch main"}, with the sync's branch made from it checked out`;
+  const why = `the project's main (${mainRef === "FETCH_HEAD" ? "fetched from the origin" : "the clone's own branch main, as the clone has no origin"}) shares no commit with the sync's branch, so the sync is not proved against it. Mend: run it in a clone that holds the project's main${mainRef === "FETCH_HEAD" ? "" : " as its branch main"}, with the sync's branch made from it checked out`;
   fail.push(why);
   done("unknown");
 }
