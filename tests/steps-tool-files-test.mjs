@@ -281,11 +281,12 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   ok(!ran && r.stdout.trim() === "null", "a program named git in the folder the guard's git starts in runs in its place for none of it, \".\" and an empty entry on the PATH too", `${ran} ${r.stdout}${r.stderr}`);
 }
 
-// (each script the core runs from its main on a head not yet proven the repository's own calls the guard itself, at
+// (each script the core runs from its main on a head not yet proven the repository's own, and the sync and its look at
+// whether the core moved, run in a project's clone on a branch that may hold anything, calls the guard itself, at
 // its top, before any line that starts a program: its own import, never one it borrows, so no reshuffle of imports
 // drops it)
 {
-  const HEADS = ["pure-sync.mjs", "attached.mjs", "own-head.mjs", "queue-only.mjs", "comment-only.mjs"];
+  const HEADS = ["pure-sync.mjs", "attached.mjs", "own-head.mjs", "queue-only.mjs", "comment-only.mjs", "sync.mjs", "core-moved.mjs"];
   const unguarded = HEADS.filter(f => {
     const src = fs.readFileSync(path.join(import.meta.dirname, "..", "scripts", f), "utf8");
     const call = src.search(/^lookOnlyOnPath\(\);$/mu), start = src.search(/\b(execFileSync|spawnSync|execSync|spawn|execFile|exec)\s*\(/u);

@@ -37,6 +37,11 @@ import { everyInstall } from "./packages.mjs";
 import { started } from "./started.mjs";
 import { NOTES, asksLeft, fetchCore, followsOf, greenMain, hostSaid, inBare, jumped, newestRelease, past, pinsBefore, plainEnv, releasesIn, staysAt, untar } from "./releases.mjs";
 import { FOLDER } from "./sync-notes.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git, started here in the project's own clone, on a branch that may hold anything, is looked for on the PATH alone,
+// as are the programs what it imports starts in this process: workflow-run.mjs)
+lookOnlyOnPath();
 
 // (the core's main and its releases, fetched into a bare repository of its own, which every call names outright, with
 // git's own variables that point elsewhere left out: releases.mjs)
