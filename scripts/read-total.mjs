@@ -75,8 +75,8 @@ export function tree(rev = null, root = ROOT) {
   };
   let load, list;
   if (!rev) {
-    const real = fs.realpathSync(root);
-    const own = (f, kind) => { try { const p = path.join(root, f); if (fs.realpathSync(p) !== path.join(real, f)) return null; const st = fs.statSync(p); return st[kind]() ? st : null; } catch { return null; } };
+    const real = fs.realpathSync.native(root);
+    const own = (f, kind) => { try { const p = path.join(root, f); if (fs.realpathSync.native(p) !== path.join(real, f)) return null; const st = fs.statSync(p); return st[kind]() ? st : null; } catch { return null; } };
     load = f => { const st = own(f, "isFile"); if (!st) return null; if (st.size > LIMITS.bytes) return { size: st.size }; try { return { buffer: fs.readFileSync(path.join(root, f)) }; } catch { return null; } };
     list = folder => { if (!inside(folder) || !own(folder, "isDirectory")) return []; try { return fs.readdirSync(path.join(root, folder)).filter(f => f.endsWith(".md")).sort().map(f => `${folder}/${f}`).filter(f => own(f, "isFile")); } catch { return []; } };
   } else {

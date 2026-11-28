@@ -65,9 +65,11 @@ let groups = null, runner = [];
 const VM = ["--import", pathToFileURL(path.join(HERE, "stryker-vm.mjs")).href];
 export const argsOf = (prefix, test) => prefix.length ? [...prefix, test] : [...VM, test];
 
-// The program of the vitest installed at the project's root (`root`), as its package.json names it: its path from the
-// root, or null where none is installed, it names none, or the one it names, its links followed, is no file inside
-// the folder, its links followed too (a folder would have node run its own package's main, wherever that stands).
+// The program of the vitest installed at the project's root (`root`), as its package.json names it: its real path, its
+// links followed as the system follows them, from the root (or whole, where it lies outside it), so node runs the file
+// judged here and never reads the links again; or null where none is installed, it names none, or the one it names
+// is no file inside the folder, its links followed too (a folder would have node run its own package's main, wherever
+// that stands).
 export function vitestAt(root) {
   const folder = "node_modules/vitest";
   let bin;
@@ -76,8 +78,10 @@ export function vitestAt(root) {
   if (typeof named !== "string") return null;
   const at = path.posix.join(folder, named.replaceAll("\\", "/"));
   try {
-    const real = fs.realpathSync(path.join(root, at)), inside = path.relative(fs.realpathSync(path.join(root, folder)), real);
-    return at.startsWith(`${folder}/`) && inside && inside.split(path.sep)[0] !== ".." && !path.isAbsolute(inside) && fs.statSync(real).isFile() ? at : null;
+    const real = fs.realpathSync.native(path.join(root, at)), inside = path.relative(fs.realpathSync.native(path.join(root, folder)), real);
+    if (!at.startsWith(`${folder}/`) || !inside || inside.split(path.sep)[0] === ".." || path.isAbsolute(inside) || !fs.statSync(real).isFile()) return null;
+    const fromRoot = path.relative(fs.realpathSync.native(root), real);
+    return fromRoot.split(path.sep)[0] === ".." || path.isAbsolute(fromRoot) ? real : fromRoot.split(path.sep).join("/");
   } catch { return null; }
 }
 

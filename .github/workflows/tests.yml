@@ -902,6 +902,9 @@ jobs:
       - name: The entry-files check
         if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/entry-files-test.mjs ')) }}
         run: node tests/entry-files-test.mjs
+      - name: What stands on the way to an agent tool's files
+        if: ${{ !cancelled() && contains(matrix.parts, 'third') && (env.RUN == 'all' || contains(env.RUN, ' tests/tool-ways-test.mjs ')) }}
+        run: node tests/tool-ways-test.mjs
       - name: Each agent tool's entry file here pulls in what the core's own AGENTS.md names
         if: ${{ !cancelled() && contains(matrix.parts, 'third') }}
         run: node scripts/entry-files.mjs --core

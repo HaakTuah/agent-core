@@ -64,7 +64,7 @@ export function filesFound(p) {
 const compared = (p, f) => !whole(f) && !NOT_COMPARED.test(f) && !SKIP.test(f) && !linked(p, f) && p.own.read(f, true) !== null;
 // A link, at the path's end or on a folder of its way, is never read as the project's own file nor written through:
 // what it leads to may be the copy's.
-export const linked = (p, f) => { try { return fs.realpathSync(path.join(p.root, f)) !== path.join(fs.realpathSync(p.root), f); } catch { return true; } };
+export const linked = (p, f) => { try { return fs.realpathSync.native(path.join(p.root, f)) !== path.join(fs.realpathSync.native(p.root), f); } catch { return true; } };
 // Only Markdown goes: what else a project holds (code, a manifest, a config) may be run, or found by a tool where it
 // stands, in ways no file names; and of Markdown, not a name a tool looks for in its folder, nor one in a dot folder.
 const MARKDOWN = /\.md$/iu;

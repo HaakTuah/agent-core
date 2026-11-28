@@ -38,7 +38,7 @@ export function current(entries, root) {
   return entries.map(e => {
     if (!registry(e).name.test(e.name ?? "")) throw new Error(`${e.name}: not a name its registry takes`);
     if (!Number.isInteger(e.days) || e.days < 7 || typeof e.how !== "string" || !e.how.trim()) throw new Error(`${e.name}: needs "days" (7 or more, floor rule 7) and "how"`);
-    const file = fs.realpathSync(path.join(root, e.file)), rel = path.relative(fs.realpathSync(root), file);
+    const file = fs.realpathSync.native(path.join(root, e.file)), rel = path.relative(fs.realpathSync.native(root), file);
     if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`${e.name}: ${e.file} is outside the project`);
     const found = new Set([...fs.readFileSync(file, "utf8").matchAll(new RegExp(e.pattern, "g"))].map(m => m[1]));
     if (found.size !== 1) throw new Error(`${e.name}: ${e.file} holds ${found.size ? [...found].join(", ") : "no version"} by ${e.pattern}, not one`);

@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { KEPT, copyTree, coreIsFolder, entries, executable, recordModes } from "../scripts/copy-tree.mjs";
 import { untar } from "../scripts/releases.mjs";
 import { install } from "../scripts/sync.mjs";
-import { scratchDir } from "../scripts/scratch-core.mjs";
+import { foldedLoop, inTime, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${detail}`}`); } };
@@ -128,6 +128,11 @@ if (process.platform !== "win32") {
     fs.rmSync("core/scripts", { recursive: true }); fs.symlinkSync(outside, "core/scripts");
     recordModes("core", modes, repo);
     ok(!(fs.statSync(path.join(outside, "run.sh")).mode & 0o111), "  and never through a link to a folder outside the copy, a folder of it that is a link");
+    fs.rmSync("core/scripts");
+    const folder = foldedLoop(project, "core/scripts"), away = path.join(folder, "run.sh");
+    fs.rmSync(folder); fs.mkdirSync(folder); fs.writeFileSync(away, "x"); fs.chmodSync(away, 0o644);
+    const said = inTime(`import { recordModes } from ${JSON.stringify(new URL("../scripts/copy-tree.mjs", import.meta.url).href)};\nrecordModes("core", ${JSON.stringify(modes)}, ${JSON.stringify(repo)});\nconsole.log("ended");`, { cwd: project });
+    ok(said?.trim() === "ended" && !(fs.statSync(away).mode & 0o111), "  nor through a folder of it that the system reads out of the copy, though its spelling stays inside", said ?? "stopped past its time");
   } finally { process.chdir(here); }
 }
 ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), repo) !== entries(plain, repo), "a link in its place is not");

@@ -358,7 +358,7 @@ const TOOL_ONLY = toolsOnly(null, null, ls);
 // What a commit held of the copies in those files: each prose window that stood there with one of its places in such a
 // file, by its hash, and in how many places. Read only where a copy or the baseline asks it.
 function toolCopiesAt(commit) {
-  const place = placeAt(commit), show = readAt(commit, place), list = dir => lsAt(commit, [dir]), there = specs => once(lsAt(commit, specs), place);
+  const place = placeAt(commit), show = readAt(commit, place), list = dir => lsAt(commit, [`:(literal)${dir}`]), there = specs => once(lsAt(commit, specs), place);
   const tools = toolsOnly(show, list, there);
   if (!tools.size) return new Map();
   let rules;
@@ -444,7 +444,7 @@ if (from) {
     };
     // (the base's rule files as its own SECURITY.md lists them, so a file taken off that list is no narrowing unseen)
     let wasRules = [];
-    if (held.some(h => h.config.proseFromSecurity === true)) try { wasRules = withTools(readAt(from), dir => lsAt(from, [dir])); } catch { /* the base read none */ }
+    if (held.some(h => h.config.proseFromSecurity === true)) try { wasRules = withTools(readAt(from), dir => lsAt(from, [`:(literal)${dir}`])); } catch { /* the base read none */ }
     const less = [...new Set(held.flatMap(h => lost("code", specs(h, "code"), CODE_SPECS).concat(lost("prose", specs(h, "prose").concat(h.config.proseFromSecurity === true ? wasRules : []), proseSpecs))))];
     if (less.length) fail(`${who} reads ${less.length} files fewer than ${from}'s config read: ${less.slice(0, 5).join(", ")}${less.length > 5 ? ", and more" : ""}. ${back}`);
   }

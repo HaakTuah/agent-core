@@ -32,13 +32,13 @@ export function ownFiles(root) {
   // missing, and a file past the size as missing too, named in `unread`, so that no file the project holds stops the
   // report; a link to a file of its own reads as that file, as the project's tools read it, and only to one git lists
   // as the project's: never git's own folder nor a file it ignores, a person's or a machine's own)
-  const home = fs.realpathSync(root), unread = [], known = new Set(listed);
+  const home = fs.realpathSync.native(root), unread = [], known = new Set(listed);
   const within = to => { const rel = path.relative(home, to); return !!rel && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel); };
   const file = f => { // the regular file of the project's own a path leads to, as { real, size }, or null
     const to = path.resolve(home, f);
     if (!within(to)) return null;
     try {
-      const real = fs.realpathSync(to), stat = fs.statSync(real);
+      const real = fs.realpathSync.native(to), stat = fs.statSync(real);
       return within(real) && known.has(path.relative(home, real).split(path.sep).join("/")) && stat.isFile() ? { real, size: stat.size } : null;
     } catch { return null; }
   };

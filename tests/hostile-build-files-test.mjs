@@ -181,6 +181,14 @@ const tool = (e) => listed({ agentTools: [{ kind: "plugin", name: "p", publisher
   try { calls = moveCalls("b".repeat(40), path.join(away, "no-core"), ownFiles(away)); } finally { process.chdir(here); }
   ok(calls.moved.length === 0 && calls.unread.join() === ".github/workflows/a.yml" && fs.readFileSync(path.join(away, "../outside.yml"), "utf8") === call, "the sync reads no workflow that is a link out of the project, names it unread, and writes nothing through it");
   ok(readBuildFile(away, ".github/workflows/a.yml") === NOT_A_FILE && readBuildFile(away, "build/x.xml") === NOT_A_FILE && projectFilesByContent(away, ["build/x.xml"]).length === 0, "NuGet's readers read no file through a link out of the project, and take none for a project file");
+  // (a link whose text steps back by a `..` after a folder link out of the project, its spelling naming a file of the
+  // project's own: read where the system reads it, outside, so as none)
+  if (process.platform !== "win32") {
+    fs.mkdirSync(path.join(away, "../deep")); fs.writeFileSync(path.join(away, "../y.md"), "away\n"); fs.writeFileSync(path.join(away, "y.md"), "inside\n");
+    fs.symlinkSync(path.join(away, "../deep"), path.join(away, "far")); fs.symlinkSync("far/../y.md", path.join(away, "z.md"));
+    spawnSync("git", ["add", "-A"], { cwd: away });
+    ok(ownFiles(away).read("y.md") === "inside\n" && ownFiles(away).read("z.md") === null, "a project's own files read no link whose `..` after a folder link leads out, though its spelling names a file of its own");
+  }
 }
 
 // ---- a number out of range ----
