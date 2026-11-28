@@ -58,7 +58,12 @@
 // image), which the licence check's audit and scan hold. A restore runs the project's own build files, a pull
 // request's too, which could change anything in the job this runs in, this script and the manifests included: so the
 // licences of what the lock files name are read before it too (--fetched), and what a pull request does to its
-// project files is the reviews' to read, as with every check that builds.
+// project files is the reviews' to read, as with every check that builds. After it (--restored) nothing of git's is
+// read for the base, since the restore could have rewritten what git reads it by (its config, its attributes, its
+// refs): each comparison with the base was made before the restore, by the read with --fetched on the same checkout
+// or, where that was left out, by the workflow's first look, whose base is the merge's first parent, as this script's
+// is, and which found nothing this reads changed; so what the base held stands as held. The flag is sound only after
+// one of those, and is refused beside --fetched; git's list of the tracked files is still read after the restore.
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
@@ -68,7 +73,10 @@
 // the project it lies in (core/scripts/ there), whatever the directory it is started from; the config's own path is
 // read from that directory.
 //
-//   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--advisory]
+//   node core/scripts/nuget.mjs <config> --packages <the folder the restore filled> [--restored] [--advisory]
+//                                               with --restored, run after a restore that the read with --fetched on
+//                                               the same checkout, or the workflow's first look, came before: nothing
+//                                               of git's read for the base
 //   node core/scripts/nuget.mjs <config> --packages <the folder nuget-fetch.mjs filled> --fetched [--advisory]
 //                                               the same, before the restore: the licences of what the lock files name,
 //                                               and of the tools a manifest of dotnet's names, read from files no pull
@@ -735,12 +743,12 @@ function restoredPackages(packagesDir) {
  * The check, on the project at `root`, whose tracked files are `tracked`, with the restore's folder:
  * { failures, summary }.
  */
-export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false } = {}) {
+export function check(config, root, packagesDir, tracked, env = process.env, { base = null, baseConfig = null, fetched = false, restored = false } = {}) {
   const copy = copyAside(root), { ships, tools, accepted, sources } = nugetConfig(config, copy);
   const lists = policy(config), { allowedFor } = lists;
   const failures = [], reports = [];
   // (the check's own state, which the parts below read and add to)
-  const c = { config, root, copy, base, packagesDir, fetched, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
+  const c = { config, root, copy, base, packagesDir, fetched, restored, lists, allowedFor, ships, failures, reports, ...baseLists(base, baseConfig, sources, copy), heldIn: new Map(), tree: null, then: null };
   const own = tracked.filter((f) => !under(f, copy));
   const locks = new Set(own.filter((f) => posix.basename(f) === LOCK));
   layoutFaults(c, tracked, own, locks);
@@ -1052,7 +1060,7 @@ function expressionWhy(c, { k, p, name, where, list, licence, entry, a, allowed 
   if (entry) { c.read.add(k); failures.push(`${name}: ${config.audit} holds an entry for it, and its manifest names its licence itself (${licence.expression}). Mend: take that entry out of ${config.audit}`); }
   if (licenceOk(licence.expression, allowed)) { if (a) { c.used.add(k); failures.push(`"nuget.accepted" names ${a.package}, which is on its list and needs no yes. Mend: take that yes out of "nuget.accepted"`); } return null; }
   if (!a && p.shipped && p.lock && movedOff(licence.expression, allowed) && shippedAtBase(c, p.lock, k)) {
-    c.reports.push(`${name} (${where}) ships under ${licence.expression}, which since ${[...MOVED_OFF].filter(([id]) => licence.expression.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${c.base ? "shipped at the pull request's base" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "nuget.accepted" or has it replaced`);
+    c.reports.push(`${name} (${where}) ships under ${licence.expression}, which since ${[...MOVED_OFF].filter(([id]) => licence.expression.includes(id)).map(([id, day]) => `${day} (${id})`).join(", ")} waits for the owner's yes (floor rule 10): ${c.base ? "shipped at the pull request's base" : c.restored ? "with no base read after the restore" : "with no base to read it against"}, it passes; file an issue for the owner, who gives the yes in "nuget.accepted" or has it replaced`);
     return null;
   }
   return `${licence.expression} is off ${list}. Mend: replace it with a package under a licence on that list; or, where the owner wants it anyway, file an issue asking the owner\'s yes, which goes in the config\'s "nuget.accepted" with the owner\'s words (floor rule 10)`;
@@ -1122,14 +1130,16 @@ if (guard(import.meta.url)) {
     for (const s of from) console.log(s);
     process.exit(0);
   }
-  if (!configPath || !packagesDir) fail("the config or the restore's folder was not named. Mend: name both: node core/scripts/nuget.mjs <config> --packages <folder> [--advisory]");
+  if (!configPath || !packagesDir) fail("the config or the restore's folder was not named. Mend: name both: node core/scripts/nuget.mjs <config> --packages <folder> [--restored] [--advisory]");
   // (the config is read only where it is a file of bytes: a device would never end)
   try { if (!statSync(configPath).isFile()) fail(`${configPath} is no file of bytes (a link to a device, a folder or a pipe). Mend: make it a file`); } catch { /* (one that is not there fails as it is loaded) */ }
+  if (args.includes("--restored") && args.includes("--fetched")) fail("--restored and --fetched were both given: --restored is for the run after a restore, which the read with --fetched comes before. Mend: run the read with --fetched before the restore and the one with --restored after it, each on its own");
   let result;
   try {
     const { root, tracked } = project(), config = loadConfig(configPath, root);
-    const base = baseOf(root);
-    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched") });
+    // (after a restore, no base: what git would read it by, the restore could have written)
+    const restored = args.includes("--restored"), base = restored ? null : baseOf(root);
+    result = check(config, root, packagesDir, tracked, process.env, { base, baseConfig: configAt(root, base, configPath), fetched: args.includes("--fetched"), restored });
   } catch (e) { fail(e.message); }
   for (const r of result.reports) console.log(`REPORT: ${r}`);
   for (const f of result.failures) console.error(`${advisory ? "WOULD FAIL" : "FAIL"}: ${f}`);
