@@ -219,7 +219,7 @@ mkdir -p "$dir/obj" "$COPY/obj"
 printf '{"project":{"restore":{"projectPath":"%s/%s"},"frameworks":{}}}' "$PWD" "\${last#./}" > "$dir/obj/project.assets.json"
 printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":{"downloadDependencies":[{"name":"Beside.Lock"}]}}}}' "$PWD" "$COPY" > "$COPY/obj/project.assets.json"
 `, { mode: 0o755 });
-  const atCopy = (copy, at, bin = standIn, files = {}) => {
+  const atCopy = (copy, at, bin = standIn, files = {}, more = {}) => {
     const dir = path.join(tmp, `copy-${++n}`);
     fs.mkdirSync(dir);
     git(dir, "init", "-q", "-b", "main");
@@ -234,8 +234,8 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
     const output = path.join(tmp, `look-${n}`);
     fs.writeFileSync(output, "");
     const r = spawnSync("bash", ["-e", `${copy}scripts/nuget-look.sh`], { cwd: dir, encoding: "utf8", env: { ...env, PATH: `${bin}${path.delimiter}${env.PATH}`, COPY: at, BASE: baseSha, CONFIG: "checks/licences.json", OWN: "true",
-      CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output } });
-    return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}` };
+      CALLER: "someone/project/.github/workflows/restore.yml@refs/pull/1/merge", GITHUB_REPOSITORY: "someone/project", CORE_AT: copy, NUGET_PACKAGES: path.join(tmp, `look-packages-${n}`), GITHUB_OUTPUT: output, ...more } });
+    return { run: r.status === 0 ? /^run=(.*)$/m.exec(fs.readFileSync(output, "utf8"))?.[1]?.trim() : undefined, out: `${r.stdout}${r.stderr}`, dir };
   };
   const vendor = atCopy("vendor/core/", "vendor/core/"), deeper = atCopy("third_party/the-core/", "third_party/the-core/"), usual = atCopy("core/", "core/");
   ok(vendor.run === "false" && deeper.run === "false" && usual.run === "false", "the restore's records inside the copy of the core, at core/ or at the path the caller gives, are no project's own: the look says no restore", [vendor, deeper, usual].map(r => r.out).join("\n"));
@@ -245,6 +245,17 @@ printf '{"project":{"restore":{"projectPath":"%s/%sx.csproj"},"frameworks":{"x":
   // a project file whose path starts with "::" or holds "##[" is named broken in each failure line, as NuGet's own output
   // is: a stand-in for dotnet whose restore fails, with no error named and with one NuGet names
   const failing = said => { const bin = path.join(tmp, `fails-${++n}`); fs.mkdirSync(bin); fs.writeFileSync(path.join(bin, "dotnet"), `#!/bin/sh\n${said}\nexit 1\n`, { mode: 0o755 }); return bin; };
+  // (what the look makes for its restores, in a TMPDIR of the test's own, empty, is gone after a look that holds and
+  // after one whose restore fails; #1569)
+  const temps = which => { const at = path.join(tmp, `temps-${which}`); fs.mkdirSync(at); return { at, more: { TMPDIR: at } }; };
+  const held = temps("held"), broke = temps("broke");
+  const holding = atCopy("core/", "core/", standIn, {}, held.more), failed = atCopy("core/", "core/", failing("echo 'error NU1004: the lock file'"), {}, broke.more);
+  ok(holding.run === "false" && failed.run === "true" && failed.out.includes("App.csproj: error NU1004") && fs.readdirSync(held.at).length === 0 && fs.readdirSync(broke.at).length === 0,
+    "the first look's restores leave nothing behind in the temporary folder, where they hold and where one fails", `${holding.out}\n${failed.out}\n${fs.readdirSync(held.at)} ${fs.readdirSync(broke.at)}`);
+  // (and where no temporary folder can be made, no restore runs, nothing is written in the project, and the check runs)
+  const none = atCopy("core/", "core/", standIn, {}, { TMPDIR: path.join(tmp, "temps-none") });
+  ok(none.run === "true" && none.out.includes("NuGet could not say") && git(none.dir, "status", "--porcelain", "--untracked-files=all", "--ignored") === "",
+    "where no temporary folder can be made, the look restores nothing, writes nothing in the project and says the check runs", `${none.out}\n${git(none.dir, "status", "--porcelain", "--untracked-files=all", "--ignored")}`);
   const unnamed = atCopy("core/", "core/", failing(""), { "::error::x/App.csproj": project() }).out, coded = atCopy("core/", "core/", failing('echo "error NU1004: the lock file"'), { "src/##[group]x/App.csproj": project() }).out;
   ok(unnamed.includes(": :error: :x/App.csproj: the restore failed with no error NuGet names") && !/^\s*::/m.test(unnamed), "a project file's path that starts with \"::\" is broken where the restore fails with no error named", unnamed);
   ok(coded.includes("src/# #[group]x/App.csproj: error NU1004") && !coded.includes("##["), "and one that holds \"##[\" is broken where it fails with an error NuGet names", coded);
