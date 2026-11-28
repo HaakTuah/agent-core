@@ -205,6 +205,13 @@ try {
     put("docs/big/huge.md", `# Huge\n\n${"y".repeat((1 << 20) + 10)}\n`);
     t = check({ POINTERS_BASE: "HEAD" });
     ok(t.status === 1 && mended(t.out) && /FAIL: the rule file docs\/big\/huge\.md is no regular file/.test(t.out), "and one the pull request changes fails, saying its mend", t.out);
+    // (and a link there to a large file inside the project, both held by the base as they stand: noted)
+    put("docs/big/huge.md", `# Huge\n\n${"x".repeat((1 << 20) + 10)}\n`);
+    put("docs/large.md", `# Large\n\n${"z".repeat((1 << 20) + 10)}\n`);
+    fs.symlinkSync("../large.md", path.join(tools, "docs/big/to-large.md"));
+    g("add", "-A"); g("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "a link to a large file there");
+    t = check({ POINTERS_BASE: "HEAD" });
+    ok(t.status === 0 && /^note the rule file docs\/big\/to-large\.md is no regular file .*the pull request's base held it/m.test(t.out), "a link there to a large file, held by the base as it stands, is noted too, as git reads a link", t.out);
   }
 } finally { fs.rmSync(tools, { recursive: true, force: true }); }
 // the core's own run: there it fails

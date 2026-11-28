@@ -99,9 +99,10 @@ try {
   RULES = AT ? [...TOOLS] : [...old, ...TOOLS];
 } catch (e) { console.error(`FAIL: ${loggedAlone(e.message)}`); process.exit(1); }
 for (const rf of RULES.filter(f => !tracked.includes(f))) { console.error(`FAIL: ${logged(`the rule file ${rf} is no tracked file`)}. Mend: add it to git, or take out the pointer that names it as a rule file`); process.exitCode = 1; }
-// (one the pull request's base held as it stands, past the bound or unread, stood before the check read it: noted, as
-// "Nothing locks a project" asks; one the pull request brings or changes fails)
-const stoodAtBase = f => { const sha = process.env.POINTERS_BASE ? baseCommit() : null; if (!sha) return false; try { return git(["rev-parse", "--verify", "--quiet", `${sha}:${f}`]).trim() === git(["hash-object", "--", f]).trim(); } catch { return false; } };
+// (a rule file, a tool's or any other, past the bound or unread, that the pull request's base held as it stands, as git
+// compares it with the work tree, a link by its text, stood before the check read it: noted, as "Nothing locks a
+// project" asks; one the pull request brings or changes fails)
+const stoodAtBase = f => { const sha = process.env.POINTERS_BASE ? baseCommit() : null; if (!sha) return false; try { git(["diff", "--quiet", sha, "--", `:(literal)${f}`]); return true; } catch { return false; } };
 for (const rf of RULES.filter(f => !AT && tracked.includes(f) && own(f) === null)) {
   const said = `the rule file ${rf} is no regular file of the project's own of at most ${BOUND >> 20} MiB (a link that leads out of the project or to no file, or a file past that size)`, mend = `make it a file of the project's own, or a link to one inside the project, and keep it under ${BOUND >> 20} MiB`;
   if (stoodAtBase(rf)) { console.log(`note ${logged(said)} (the pull request's base held it as it stands, so it fails nothing: ${mend})`); continue; }
