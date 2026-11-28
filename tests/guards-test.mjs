@@ -43,6 +43,13 @@ try {
   try { fs.symlinkSync(["far", "..", "up-to.json"].join(path.sep), path.join(project, "up.json")); } catch { upLink = false; }
   ok(!upLink || leadsOut(project, path.join(project, "up.json")) === (fs.readFileSync(path.join(project, "up.json"), "utf8") === "away"),
     "a link whose text steps back by a `..` after a folder link out of the project leads out exactly where the system reads it outside, though its spelling stays inside");
+  // (the same `..` in the path given, written as is, never joined: a read of it leads where the link's would)
+  const given = ["far", "..", "up-to.json"].join(path.sep), was = process.cwd(), readOut = fs.readFileSync(`${project}${path.sep}${given}`, "utf8") === "away";
+  try {
+    process.chdir(project);
+    ok([`${project}${path.sep}${given}`, given].every(at => leadsOut(project, at) === readOut) && leadsOut(".", ["far", "..", "new.json"].join(path.sep)) === readOut,
+      "a path given with a `..` after a folder link out of the project leads out exactly where a read of it leads outside, also where it does not stand yet, though its spelling stays inside");
+  } finally { process.chdir(was); }
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
     ok(leadsOut(project, path.join(project, "dangling.json")), "a link that leads nowhere leads out");
