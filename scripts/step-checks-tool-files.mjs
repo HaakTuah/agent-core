@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { leadsOut } from "./guards.mjs";
 import { READ_MOST } from "./own-files.mjs";
-import { FOLDERS, TOOL_FILES, ruleFiles } from "./rule-files.mjs";
+import { FOLDERS, TOOL_FILES, linksIn, ruleFiles } from "./rule-files.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { copiesConfig } from "./check-configs.mjs";
 import { shown } from "./step-checks.mjs";
@@ -69,7 +69,9 @@ function filesRead(p, config, tracked, git) {
     const parsed = JSON.parse(p.read(config) ?? ""), names = v => (Array.isArray(v) ? v.filter(x => typeof x === "string" && x) : []);
     // (each list as copies.mjs lists it, by itself: a ":!" leaves out only what its own list read)
     const ls = specs => (specs.length ? git(["ls-files", "-z", "--", ...specs]).split("\0") : []);
-    const rules = ruleFiles(p.read, dir => tracked.filter(f => (f === dir || f.startsWith(`${dir}/`)) && !leadsOut(p.root, path.join(p.root, f))), { tools: true });
+    // (carrying where a path leads and the links on its way, as the checks' readers do, so that a tool's folder that is a
+    // link is listed where it leads: rule-files.mjs, linksIn)
+    const rules = ruleFiles(Object.assign(f => p.read(f), linksIn(p.root)), dir => tracked.filter(f => (f === dir || f.startsWith(`${dir}/`)) && !leadsOut(p.root, path.join(p.root, f))), { tools: true });
     const tools = tracked.filter(f => TOOL_FILES.includes(f) || FOLDERS.some(dir => f === dir || f.startsWith(`${dir}/`)));
     const named = new Set([config, parsed.baseline, ...rules, ...tools, ...ls(names(parsed.code)), ...ls([...names(parsed.prose), ...(parsed.proseFromSecurity === true ? rules : [])])]);
     return new Set(tracked.filter(f => named.has(f) || f.startsWith(copyAt(p)) || /\.md$/iu.test(f) || /(^|\/)(core-manifest\.md|\.gitattributes|\.gitmodules)$/u.test(f)));

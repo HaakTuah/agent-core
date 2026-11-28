@@ -13,13 +13,11 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { shown } from "./step-checks.mjs";
-import { withAbsolutePath } from "./workflow-run.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
 
 // (no program is looked for in the folder it is started in, which the project fills, as check.mjs holds it, for each
-// process that loads this file: the steps, and the copy's scripts they run. On Windows not by default, and on any system
-// not by way of a relative entry on the PATH, "." or an empty one among them)
-if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
-for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
+// process that loads this file: the steps, attached.mjs, and the copy's scripts they run)
+lookOnlyOnPath();
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // (what a script of the core's can load: its scripts, and the packages it imports from .packages/ by its lock files)
 export const LOADED = ["scripts", ".packages"];
@@ -53,8 +51,9 @@ export function outside(root, at) {
   return inside(base, real(path.join(root, at))) && inside(base, real(path.join(root, at, "scripts"))) ? null : `${shown(at)} or its scripts lie outside the project, so none of them was run from here. Mend: keep the copy in the project's own tree, as the sync writes it`;
 }
 
-// Null where the copy at `at` may be run from here; else why not, with the mend, naming no path outside the project.
-export function copyRefused(root, at) {
+// Null where the copy at `at` may be run from here; else why not, with the mend, naming no path outside the project:
+// `mend`'s where the caller gives one that fits it, else the steps'.
+export function copyRefused(root, at, mend = `run the steps from the project's copy, \`node ${shown(at)}scripts/steps.mjs\`, or from a clone of the core at the copy's pin`) {
   const away = outside(root, at);
   if (away) return away;
   if (real(path.join(root, at, "scripts")) === real(HERE)) return null;
@@ -63,7 +62,7 @@ export function copyRefused(root, at) {
   const off = own && copy ? [...new Set([...own.keys(), ...copy.keys()])].sort().find(f => own.get(f) !== copy.get(f)) : null;
   if (own && copy && off === undefined) return null;
   const which = !own ? "the core running these steps is no work tree git lists" : !copy ? `${shown(at)} could not be listed and read` : `${shown(`${at}${off}`)} ${!copy.has(off) ? "is missing" : !own.has(off) ? "is not the core's" : "is changed"}`;
-  return `${shown(at)}'s scripts and packages are not those of the core running these steps (${which}), so none of them was run from here. Mend: run the steps from the project's copy, \`node ${shown(at)}scripts/steps.mjs\`, or from a clone of the core at the copy's pin`;
+  return `${shown(at)}'s scripts and packages are not those of the core running these steps (${which}), so none of them was run from here. Mend: ${mend}`;
 }
 
 // A script of the copy at `at` run from the project's root `root`, from where it resolves once checked, given ten

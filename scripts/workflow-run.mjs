@@ -327,6 +327,14 @@ export function withAbsolutePath(env) {
   return key === undefined ? { ...env } : { ...env, [key]: absolutePath(env[key]) };
 }
 
+// This process kept, with each it starts, from looking for a program in the folder it starts in, which a change under
+// check or a project fills (#513): on Windows not by default, and on any system not by way of a relative entry on the
+// PATH, "." or an empty one among them. Each caller says why it sets it.
+export function lookOnlyOnPath() {
+  if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
+  for (const [key, value] of Object.entries(withAbsolutePath({ ...process.env }))) if (/^path$/iu.test(key)) process.env[key] = value;
+}
+
 // The program a name stands for, by its full path from the PATH's own folders, never from the folder it would start in:
 // on Windows a program started by its bare name is looked for there first, by Node and by cmd.exe alike, and a step's
 // folder holds the change under check (#513). As the system looks, the name as it is, and on Windows with .com and

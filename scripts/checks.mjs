@@ -40,6 +40,7 @@ import { installStep, installed } from "./packages.mjs";
 import { npmIgnores, npmReadsAll, npmRefusal, npmVersion } from "./npm-reads.mjs";
 import { asText } from "./guards.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
 
 export const PARTS = ["copies", "description", "signatures", "nuget"];
 const OPTIONS = ["--base", "--copies", "--sizes", "--description", "--parts", "--signatures", "--nuget"];
@@ -61,9 +62,9 @@ export const COPIES = [
 function fail(what, mend) { console.log(`FAIL ${what} ${MEND}${mend}`); process.exit(1); }
 
 function main() {
-  // (on Windows, no program is looked for in the folder a check runs in, which the change under check fills: neither by
-  // Node when it starts one nor by a shell it starts; every other system looks only on the PATH)
-  if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath = "1";
+  // (no program is looked for in the folder a check runs in, which the change under check fills: neither by Node when it
+  // starts one nor by a shell it starts, on Windows by default and on any system by a relative entry on the PATH)
+  lookOnlyOnPath();
   let root;
   try { root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
   catch { fail("this folder is in no git repository.", "run it from the project's root, in its clone."); }

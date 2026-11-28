@@ -11,6 +11,7 @@ import { toolFilesRead, toolFilesState } from "../scripts/step-checks-tool-files
 import { STEPS, Unread, project } from "../scripts/steps.mjs";
 import { Unwritten, held, writeToolCopies } from "../scripts/step-writers.mjs";
 import { copyRefused } from "../scripts/copy-runs.mjs";
+import { attached } from "../scripts/attached.mjs";
 import { READ_MOST } from "../scripts/own-files.mjs";
 import { kitIn } from "../scripts/steps-kit.mjs";
 import { scratchDir, tally } from "../scripts/scratch-core.mjs";
@@ -150,6 +151,16 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
     // (git's own files that change what a check lists)
     const git = [".gitattributes", ".gitmodules"].map(f => { put(f, "\n"); stage(f); const was = state(); put(f, "# x\n"); const now = state(); unstage(f); fs.rmSync(path.join(d, f)); return was !== now; });
     ok(git.every(Boolean), "a change to .gitattributes or .gitmodules asks a new run", `${git}`);
+    // (a tool's folder that is a link inside the project is read where it leads, as the pointer check reads it:
+    // rule-files.mjs, linksIn)
+    if (process.platform !== "win32") {
+      const into = "docs/steer/x.txt", folder = path.join(d, ".agent/rules");
+      put(into, "x\n"); fs.mkdirSync(path.dirname(folder), { recursive: true }); fs.symlinkSync("../docs/steer", folder);
+      stage(into); stage(".agent/rules");
+      const was = state(); put(into, "y\n"); const now = state();
+      unstage(".agent/rules"); unstage(into); fs.rmSync(path.join(d, ".agent"), { recursive: true }); fs.rmSync(path.join(d, "docs/steer"), { recursive: true });
+      ok(was !== now && state() === base, "a change to a file of a tool's folder that is a link inside the project asks a new run", `${was !== now}`);
+    }
     // (where the rule files cannot be read, no file is left out)
     put("SECURITY.md", security.replace(/\*\*the rule files:\*\*/u, "**the files of rules:**"));
     const whole = state(), flow = `.github/workflows/${flows[0]}`;
@@ -189,10 +200,25 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   }
   ok(!fs.existsSync(list), "nor writes the names' list", "");
   if (kept) fs.writeFileSync(list, kept);
-  // (and no other step runs a script of its own: each goes through copy-runs.mjs)
-  const scripts = path.join(import.meta.dirname, "..", "scripts"), stepFiles = [...fs.readdirSync(scripts).filter(f => /^step-.*\.mjs$/u.test(f)), ...fs.readdirSync(path.join(scripts, "steps")).map(f => `steps/${f}`)];
-  const spawning = stepFiles.filter(f => /process\.execPath/u.test(fs.readFileSync(path.join(scripts, f), "utf8")));
-  ok(spawning.length === 0, "no step's file runs a script of Node's but through copy-runs.mjs", spawning.join(", "));
+  // (nor does attached.mjs, run from here, where the copy was not found whole at its pin: here no core is fetched, so it is
+  // not; its pointers are not read, with its own mend)
+  const pointed = changed("pointers.mjs", () => attached(d, { fetched: path.join(tmp, "no-core") }).unread.join("\n"));
+  ok(!pointed.ran && /^the pointers: core\/ was not found whole at its pin; core\/'s scripts and packages are not those of the core running these steps \(core\/scripts\/pointers\.mjs is changed\), so none of them was run from here\. Mend: run this from the project's copy, `node core\/scripts\/attached\.mjs`/mu.test(pointed.out), "nor attached.mjs, run from here, where the copy was not found whole at its pin", `${pointed.ran} ${pointed.out}`);
+  // (and no other step, nor steps.mjs or attached.mjs, starts Node or loads code but through copy-runs.mjs, or as each
+  // run or load named here, of the core's own files or past copy-runs.mjs's reading, does: by Node's own path, by a bare
+  // `node`, by fork() or a Worker, or by import() or createRequire(). Left to review, since no grep tells it: a run by a
+  // shell's words, and a load through a helper of another file given a path the copy holds)
+  const scripts = path.join(import.meta.dirname, "..", "scripts");
+  const swept = [...fs.readdirSync(scripts).filter(f => /^step-.*\.mjs$/u.test(f)), ...fs.readdirSync(path.join(scripts, "steps")).map(f => `steps/${f}`), "steps.mjs", "attached.mjs"];
+  const named = {
+    "steps.mjs": ["import(pathToFileURL(path.join(FOLDER, f)).href)", "import(\"./converge.mjs\")"],
+    "attached.mjs": ["spawnSync(process.execPath, [path.join(scripts, \"pointers.mjs\")]", "spawnSync(process.execPath, [path.join(dir, \"scripts\", \"install.mjs\"), \"all\"]", "spawnSync(process.execPath, [path.join(dir, \"scripts\", \"pure-sync.mjs\")]"],
+  };
+  const starts = /process\.execPath|["'`]node(\.exe)?["'`]|\bfork\(|new Worker\(|\bimport\(|createRequire\(/u;
+  const unnamed = swept.flatMap(f => fs.readFileSync(path.join(scripts, f), "utf8").split("\n").filter(l => !/^\s*\/\//u.test(l) && starts.test(l))
+    .filter(l => !(named[f] ?? []).some(n => l.includes(n))).map(l => `${f}: ${l.trim().slice(0, 120)}`));
+  const unused = Object.entries(named).flatMap(([f, ns]) => ns.filter(n => !fs.readFileSync(path.join(scripts, f), "utf8").includes(n)).map(n => `${f}: ${n}`));
+  ok(unnamed.length === 0 && unused.length === 0, "no step's file, nor steps.mjs or attached.mjs, starts Node or loads code but through copy-runs.mjs, or as a run named here", [...unnamed, ...unused.map(u => `named and not found: ${u}`)].join("\n"));
   if (process.platform !== "win32") {
     const at = path.join(d, "core/scripts/pointers.mjs"), was = fs.readFileSync(at), outside = path.join(tmp, "pointers-outside.mjs");
     fs.writeFileSync(outside, `(await import("node:fs")).writeFileSync(${JSON.stringify(mark)}, "ran");\n${was}`);
