@@ -130,8 +130,8 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      a fork's among them: read by the check that a head comes from a branch of the repository itself
      (`scripts/own-head.mjs`, for `scripts/pure-sync.mjs` and `scripts/attached.mjs`), which compares the repositories
      by the host's number for each alone, says a pull request's number only where it is a number and no name the answer
-     gives, and shows nothing where a field is missing or of another shape; limits: 64 MB of an answer, every page,
-     60 s; hostile tests: `tests/pure-sync-test.mjs`.
+     gives, and shows nothing where a field is missing or of another shape; limits: 64 MB of an answer, the pages none
+     of their own, the 64 MB bounding them all, 60 s; hostile tests: `tests/pure-sync-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps

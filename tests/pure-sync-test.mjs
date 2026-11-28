@@ -195,7 +195,7 @@ for (const [pulls, why, what] of [[null, /could not be read: gh gave no answer f
   [[{ ...aPull(LEGIT), base: { sha: base, repo: { full_name: "someone/project" } } }], /lacks its head's or its base's repository/, "its base's repository has no id"],
   ...[0, -REPO_ID, String(REPO_ID), 2 ** 53].map(n => [[aPull(LEGIT, { full_name: "someone/project", id: n })], /lacks its head's or its base's repository/, `its head's repository's id is ${JSON.stringify(n)}, out of range or no number`]),
   [[{ ...aPull(LEGIT), head: { sha: 7, repo: ours } }], /lacks a field it always gives/, "a head's commit is no text"],
-  [{ message: "Not a list" }, /lacks a field it always gives/, "a page of the answer is no list"],
+  [aPull(LEGIT), /lacks a field it always gives/, "a page of the answer is one pull request, no list of them"],
   [[{ ...aPull(LEGIT, { full_name: "../<b>x</b>", id: REPO_ID + 1 }), number: "<b>1</b>" }], /comes from a repository other than someone\/project, so nothing was run/, "its fields hold markup and a path"],
   [[{ ...aPull(LEGIT), title: "x".repeat(1 << 26) }], /could not be read: gh gave no answer for someone\/project's open pull requests/, "the host's answer is past 64 MB"]]) {
   const r = pure(pulls);
