@@ -17,14 +17,18 @@
 //     or a tools manifest that does fails as well, and is never read). A file so brought in, or one not plain UTF-8 or
 //     no file, read only lately, is reported where the base held it as it stands, and brought it in by the same files
 //     (core archive 207);
-//   - that a build file holds nothing the read before the restore does not read: a target or a task, an item that
-//     downloads a package or names a pack the SDK downloads (PackageDownload, DotNetCliToolReference, the Known*
-//     items), an SDK taken from a package (a project's or an Import's named with a version, an Sdk element with one, a
-//     global.json's "msbuild-sdks"), an Import or such a property it cannot follow, or a document type. Each fails but
-//     where the base held it in the same file (by its lines, counted, as an audit's "fetches"), or the config's
-//     "nuget.unread" declares it word for word, as the failure prints it; a line declared that no form matches fails.
-//     The declaration is read from the config as the pull request holds it, as an audit entry's "fetches" is read from
-//     the audit it holds: one a pull request adds stands in its diff, in a protected file, for the reviews to read;
+//   - that the project holds nothing the read before the restore does not read: in a build file, a target or a task,
+//     an item that downloads a package or names a pack the SDK downloads (PackageDownload, _PackageToDownload,
+//     DotNetCliToolReference, the Known* items), an SDK taken from a package (a project's or an Import's named with a
+//     version, an Sdk element with one), or an Import or such a property it cannot follow; in a global.json, anything
+//     but the SDK's own version, roll-forward and pre-release ("msbuild-sdks", "sdk.paths" and the like); and any file
+//     that is a program (isProgram), which a restore may be made to load. Each is a line that names it by its text's
+//     or its bytes' hash, so that any change to it is another line, and fails but where the base held it in the same
+//     file (by its lines, counted, as an audit's "fetches"), or the config's "nuget.unread" declares it word for word,
+//     as the failure prints it; a line declared that no form matches fails. The declaration is read from the config as
+//     the pull request holds it, as an audit entry's "fetches" is read from the audit it holds: one a pull request
+//     adds stands in its diff, in a protected file, for the reviews to read. A document type fails but where its
+//     file stands as the base held it, and is never declared;
 //   - floor rule 7's "its source checked": the workflow's restore names its sources itself, NuGet's own registry and
 //     what the config's "sources" names, which overrules every NuGet.Config, and holds each package to the hash its
 //     lock file names, so a package that came from elsewhere when the lock file was written passes only if it is,
@@ -73,8 +77,12 @@
 // stands as held, and the forms above are not read again. The flag is sound only after that read, and is refused
 // beside --fetched; git's list of the tracked files is still read after the restore, in the same step as the restore,
 // holding nothing the restore did not. What a target or a task the base held, or the config declares, writes once the
-// restore runs it, this script and the manifests included, the read after the restore reads as it finds it: the read
-// before the restore is the one whose verdict no build has touched.
+// restore runs it, this script and the manifests included, the read after the restore reads as it finds it, and so
+// does it what such a target or task does where a pull request brings it into play (a condition turned, an Import
+// added), each running as the base wrote it or the config declares it; a file such a target or task runs that is no
+// program (a script), which a pull request changes, runs at the first look's own build too, before the read, where
+// nothing else the look reads changed, and gains there nothing over what it may write after the read, since nothing
+// the read judges differs from the base's.
 // A manifest is read as the XML it is, by the one licence element under its one metadata part, as NuGet finds it,
 // and only in the plain form every real manifest has: anything else (a document type, a manifest that is not well
 // formed, two such parts or elements, a name that is not plain ASCII or has a prefix, a namespace declared anywhere
@@ -109,6 +117,7 @@
 // --advisory it says what it would fail and passes, for a project where the check itself is at fault, while that is
 // mended.
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, openSync, readSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -211,11 +220,19 @@ function passedOver(text, i) {
   }
   return null;
 }
-// What the read before the restore does not read in a build file, each a line, its blanks collapsed, as the config's
-// "nuget.unread" declares one: each target, task, and item that downloads a package or names a pack the SDK downloads,
-// whole, and the tag of a project or an Import whose SDK comes from a package. One with no end is read to the file's.
-const WHOLE = /^(?:target|usingtask|packagedownload|dotnetclitoolreference|known[a-z0-9_.-]*)$/iu;
-export const collapsed = (s) => s.replace(/\s+/gu, " ").trim();
+// What the read before the restore does not read in a build file, each as its text: each target, task, and item that
+// downloads a package or names a pack the SDK downloads, whole, and the tag of a project or an Import whose SDK comes
+// from a package. One with no end is read to the file's.
+const WHOLE = /^(?:target|usingtask|packagedownload|_packagetodownload|dotnetclitoolreference|known[a-z0-9_.-]*)$/iu;
+const collapsed = (s) => s.replace(/\s+/gu, " ").trim();
+// (a form as a line: its text, its blanks collapsed so that it reads on one line, and the hash of its text as written,
+// line endings aside, so that a line stands for that text alone)
+const hashOf = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const formLine = (text) => `${collapsed(text)} (its text's sha256 ${hashOf(text.replace(/\r\n?/gu, "\n")).slice(0, 16)})`;
+// (the first bytes of a program a machine or a runtime loads: a Windows or .NET one, an ELF one, a Mach-O one, Java's
+// and WebAssembly's)
+const PROGRAM = [[0x4d, 0x5a], [0x7f, 0x45, 0x4c, 0x46], [0xfe, 0xed, 0xfa, 0xce], [0xfe, 0xed, 0xfa, 0xcf], [0xce, 0xfa, 0xed, 0xfe], [0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe], [0, 0x61, 0x73, 0x6d]];
+export const isProgram = (bytes) => Buffer.isBuffer(bytes) && PROGRAM.some((start) => start.every((x, k) => bytes[k] === x));
 export function formsIn(text) {
   const found = [];
   for (let i = text.indexOf("<"); i >= 0 && i < text.length; i = text.indexOf("<", i)) {
@@ -226,11 +243,11 @@ export function formsIn(text) {
     const end = tagEnd(text, i + tag[0].length);
     if (WHOLE.test(tag[1])) {
       const close = end >= text.length ? text.length : text[end - 1] === "/" ? end + 1 : elementEnd(text, end + 1, tag[1]);
-      found.push(collapsed(text.slice(i, close)));
+      found.push(text.slice(i, close));
       i = close;
       continue;
     }
-    if (sdkFromPackage(tag[1], text.slice(i + tag[0].length, end))) found.push(collapsed(text.slice(i, end + 1)));
+    if (sdkFromPackage(tag[1], text.slice(i + tag[0].length, end))) found.push(text.slice(i, end + 1));
     i = end + 1;
   }
   return found;
@@ -258,13 +275,38 @@ function sdkFromPackage(name, attributeText) {
   const sdk = at.get(lower === "sdk" ? "name" : "sdk");
   return sdk !== undefined && (sdk.includes("/") || (lower !== "project" && (at.has("version") || at.has("minimumversion"))));
 }
-/** The SDKs a global.json names under "msbuild-sdks", in any case, which MSBuild resolves from packages, each a line;
- *  one that is not JSON, which dotnet may read all the same, is one line of its own. */
-export function sdksNamed(text) {
-  let json;
-  try { json = parseBounded(unmarked(text)); } catch { return ["a global.json that is not JSON"]; }
-  return Object.entries(json && typeof json === "object" ? json : {}).filter(([k]) => k.toLowerCase() === "msbuild-sdks")
-    .flatMap(([, sdks]) => (sdks && typeof sdks === "object" && !Array.isArray(sdks) ? Object.entries(sdks).map(([n, v]) => collapsed(`msbuild-sdks: ${n} ${JSON.stringify(v)}`)) : [collapsed(`msbuild-sdks: ${JSON.stringify(sdks)}`)]));
+/** What a global.json holds beyond the SDK's own version, roll-forward and pre-release (each by its exact name, under
+ *  "sdk"), each a line, its key and its value: an SDK MSBuild takes from a package ("msbuild-sdks"), a folder of SDKs
+ *  ("sdk.paths"), anything else. One this check does not read whole (no file of bytes, not plain UTF-8, not JSON, a key
+ *  written twice, which another reader may take otherwise) is one line, naming its bytes by their hash, so that any
+ *  change to it is another line. */
+const SDK_OWN = new Set(["version", "rollForward", "allowPrerelease"]);
+export function globalForms(bytes) {
+  if (bytes === null) return [];
+  const text = bytes === NOT_A_FILE ? null : plainText(bytes);
+  let json = null;
+  try { if (text !== null && !keyTwice(unmarked(text))) json = parseBounded(unmarked(text)); } catch { /* (not JSON: read as bytes alone) */ }
+  if (!json || typeof json !== "object" || Array.isArray(json)) return [`a global.json this check does not read whole, ${bytes === NOT_A_FILE ? "no file of bytes" : `its bytes' sha256 ${hashOf(bytes)}`}`];
+  const sdk = json.sdk && typeof json.sdk === "object" && !Array.isArray(json.sdk) ? json.sdk : null;
+  return [...Object.entries(json).filter(([k]) => k !== "sdk" || !sdk), ...Object.entries(sdk ?? {}).filter(([k]) => !SDK_OWN.has(k)).map(([k, v]) => [`sdk.${k}`, v])]
+    .map(([k, v]) => collapsed(`${k}: ${JSON.stringify(v)}`));
+}
+// (whether a JSON text writes a key twice in one object; the text is read as JSON's strings and brackets alone)
+function keyTwice(text) {
+  const open = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{") open.push(new Set());
+    else if (ch === "[") open.push(null);
+    else if (ch === "}" || ch === "]") open.pop();
+    else if (ch === '"') {
+      const end = /^"(?:[^"\\]|\\.)*"/su.exec(text.slice(i))?.[0] ?? text.slice(i);
+      const keys = open.at(-1), next = text.slice(i + end.length).replace(/^[ \t\r\n]+/u, "")[0];
+      if (keys && next === ":") { let k = end; try { k = JSON.parse(end); } catch { /* (no string: no JSON either) */ } if (keys.has(k)) return true; keys.add(k); }
+      i += end.length - 1;
+    }
+  }
+  return false;
 }
 // (where a tag's attributes, read from `from`, end: at its ">", one inside a quoted value passed over)
 function tagEnd(text, from) {
@@ -394,8 +436,9 @@ function declaredEncoding(text) {
 // encoding, UTF-32's before UTF-16's: the bytes it starts with, the encoding, and how many of them are a mark)
 const MARKS = [[[0xef, 0xbb, 0xbf], "utf-8", 3], [[0xff, 0xfe, 0, 0], "utf-32le", 4], [[0, 0, 0xfe, 0xff], "utf-32be", 4], [[0xff, 0xfe], "utf-16le", 2],
   [[0xfe, 0xff], "utf-16be", 2], [[0x3c, 0, 0, 0], "utf-32le", 0], [[0, 0, 0, 0x3c], "utf-32be", 0], [[0x3c, 0], "utf-16le", 0], [[0, 0x3c], "utf-16be", 0]];
-// (a file's text by its byte-order mark, as .NET's StreamReader reads one, bytes UTF-8 does not allow as U+FFFD: only to
-// know what the file is, never to read what it names)
+// (a file's text by its byte-order mark, as .NET's StreamReader reads one, or with none by its first "<", as XML's own
+// reader finds an encoding, bytes UTF-8 does not allow as U+FFFD: only to know what the file is, never to read what it
+// names)
 function markedText(b) {
   const [, encoding, skip] = MARKS.find(([start]) => start.every((x, k) => b[k] === x)) ?? [null, "utf-8", 0], rest = b.subarray(skip);
   return encoding.startsWith("utf-32") ? utf32(rest, encoding === "utf-32le") : new TextDecoder(encoding).decode(rest);
@@ -439,9 +482,9 @@ function doctypeEnd(text, from) {
  * byte-order mark gives: what MSBuild could import by any property of a project's own (a publish profile, a file an
  * SDK's targets import by a property this check does not list), read as a build file is. A file is opened only where
  * it is a file of bytes, and read whole only where its first character past blanks is "<" and it is within BOUND bytes;
- * one past it is added to `past`, unread.
+ * one past it is added to `past`, unread, and one that begins as a program (isProgram) to `programs`, unread.
  */
-export function projectFilesByContent(root, own, past = []) {
+export function projectFilesByContent(root, own, past = [], programs = []) {
   const out = [];
   for (const f of own) {
     if (BUILD_FILE.test(f)) continue;
@@ -454,6 +497,7 @@ export function projectFilesByContent(root, own, past = []) {
       if (!st.isFile() || st.size === 0) continue;
       const head = Buffer.alloc(Math.min(st.size, 4096));
       readSync(fd, head, 0, head.length, 0);
+      if (isProgram(head)) { programs.push(f); continue; }
       const start = markedText(head).replace(/^[ \t\r\n\uFEFF]+/u, "");
       if (start === "" ? st.size <= head.length : !start.startsWith("<")) continue;
       if (st.size > BOUND) { past.push(f); continue; }
@@ -908,7 +952,8 @@ function layoutFaults({ root, copy, failures }, tracked, own, locks) {
 function buildFileFaults(c, own) {
   c.bytesNow = new Map();
   const past = [];
-  c.byContent = new Set(projectFilesByContent(c.root, own, past));
+  c.programs = [];
+  c.byContent = new Set(projectFilesByContent(c.root, own, past, c.programs));
   for (const f of past) {
     const what = `${f} begins as XML and is past ${BOUND} bytes, so this check does not read whether its root element is a Project: what it names, where MSBuild imports it by a property, goes unseen`;
     if (!c.base || heldPast(c, f)) c.reports.push(`${what} ${heldBefore}`);
@@ -930,15 +975,15 @@ function buildFileFaults(c, own) {
   }
   formFaults(c, own);
 }
-// Each form the read before the restore does not read (formsIn, sdksNamed, and an Import it cannot follow): one the
+// Each form the read before the restore does not read (formsIn, globalForms, a program, and an Import it cannot follow): one the
 // config's "nuget.unread" declares word for word, or the base held in the same file, is reported; any other fails,
 // and so does a line declared that no form matches. With no base, each is reported; after the restore, which the read
 // before it held them in, none is read.
 function formFaults(c, own) {
   if (c.restored) return;
-  const now = formsOf(c.now, own, (f) => readNow(c, f));
+  const now = formsOf(c.now, own, (f) => readNow(c, f), c.programs);
   for (const f of new Set([...now.keys(), ...Object.keys(c.unread)])) {
-    const forms = now.get(f) ?? [], { left, stale } = takeEach(forms.map((x) => x.line), c.unread[f]?.map(collapsed) ?? []);
+    const forms = now.get(f) ?? [], { left, stale } = takeEach(forms.map((x) => x.line), Object.hasOwn(c.unread, f) ? c.unread[f].map(collapsed) : []);
     for (const line of stale) c.failures.push(`the config's "nuget.unread" declares, for ${f}, ${line}, which is no form this check finds there. Mend: write it as this check prints the form, or take it out where the form is gone`);
     const unheld = c.base && left.length ? takeEach(left, (formsThen(c).get(f) ?? []).map((x) => x.line)).left : [];
     const rest = [...left];
@@ -954,20 +999,24 @@ function formFaults(c, own) {
   }
 }
 // (the forms of each file, as its lines and what is said of each: of a build file read, and of a global.json)
-function formsOf(reading, own, read) {
+function formsOf(reading, own, read, programs) {
   const out = new Map(), add = (f, line, what) => { if (!out.has(f)) out.set(f, []); out.get(f).push({ line, what }); };
   for (const [f, text] of reading.files) {
     if (reading.unreadable.has(f) || reading.typed.includes(f)) continue;
-    for (const line of formsIn(text)) add(f, line, `holds what the read before the restore does not follow (a target, a task, or a download or an SDK from a package): ${line}`);
+    for (const line of formsIn(text).map(formLine)) add(f, line, `holds what the read before the restore does not follow (a target, a task, or a download or an SDK from a package): ${line}`);
   }
   for (const { from, project, via, why } of reading.unread) { const line = via ? `brings in ${project} by ${via}` : `imports ${project}`; add(from, line, `${line}, ${why}: what it brings in goes unread`); }
   for (const f of own.filter((g) => posix.basename(g).toLowerCase() === "global.json")) {
-    const bytes = read(f), text = bytes === NOT_A_FILE || bytes === null ? null : plainText(bytes);
-    for (const line of text === null ? ["a global.json that is not plain UTF-8"] : sdksNamed(text)) add(f, line, `names an SDK MSBuild takes from a package, which the read before the restore does not read: ${line}`);
+    for (const line of globalForms(read(f))) add(f, line, `holds what the read before the restore does not read (an SDK from a package, a folder of SDKs): ${line}`);
+  }
+  // (a program, which a build, the SDK or NuGet may be made to load, by a property as by a task: by its bytes' hash)
+  for (const f of programs) {
+    const bytes = read(f);
+    if (isProgram(bytes)) { const line = `a program, its bytes' sha256 ${hashOf(bytes)}`; add(f, line, `is ${line}, which a restore may be made to load and the read before it does not read`); }
   }
   return out;
 }
-const formsThen = (c) => (c.formsThen ??= formsOf(readingThen(c), [...baseTree(c).keys()], (g) => baseBytes(c, g)));
+const formsThen = (c) => (c.formsThen ??= formsOf(readingThen(c), [...baseTree(c).keys()], (g) => baseBytes(c, g), c.programs));
 function readNow(c, f) {
   if (!c.bytesNow.has(f)) c.bytesNow.set(f, readProject(c.root, f));
   return c.bytesNow.get(f);
@@ -1235,9 +1284,10 @@ if (guard(import.meta.url)) {
   if (args.includes("--imports")) {
     let files;
     try {
-      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), past = [], byContent = projectFilesByContent(root, own, past);
-      // (one past the bound too, unread: whether MSBuild imports it is unseen, so a change to it alone is one to check)
-      files = [...new Set([...byContent, ...past, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
+      const { root, tracked } = project(), copy = copyAside(root), own = tracked.filter((f) => !under(f, copy)), past = [], programs = [], byContent = projectFilesByContent(root, own, past, programs);
+      // (one past the bound too, unread: whether MSBuild imports it is unseen, so a change to it alone is one to check;
+      // and each program, which a build or the SDK may load)
+      files = [...new Set([...byContent, ...past, ...programs, ...importsOf(own, (f) => readProject(root, f), byContent).brought.keys()])];
     } catch (e) { fail(e.message); }
     const odd = files.filter((f) => oneLine(f) !== f);
     if (odd.length) fail(`a file an Import brings in whose name holds a line break or a control character: ${odd.join(", ")}. Mend: rename it`);

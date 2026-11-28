@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NOT_A_FILE, REGISTRY, check as checked, formsIn, importPath, imported, importsOf, lockPackages, plainText, projectFilesByContent, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, sdksNamed, sourcesOf } from "../scripts/nuget.mjs";
+import { NOT_A_FILE, REGISTRY, check as checked, formsIn, importPath, imported, importsOf, lockPackages, plainText, projectFilesByContent, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, globalForms, isProgram, sourcesOf } from "../scripts/nuget.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { fetchAll } from "../scripts/nuget-fetch.mjs";
 import { packagesOf } from "../scripts/lookup.mjs";
@@ -707,8 +707,18 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
     "a download, a pack named, a tool, a target and a task are read whole, an end tag in a comment or CDATA no end, and an SDK with a version by its tag; a package reference, an SDK of the SDK's own and a comment are none", JSON.stringify(forms));
   ok(formsIn(`<Project Sdk="Microsoft.NET.Sdk;My.Sdk/1.0.0">`).length === 1 && formsIn(`<Project><Target Name="T"><Exec Command="x" />`).join() === '<Target Name="T"><Exec Command="x" />' && formsIn(`<Project><Target Name="A"><Target Name="B" /></Target><Target Name="C" /></Project>`).length === 2,
     "a project's SDK from a package is one, a target with no end is read to the file's, and one inside another is part of it");
-  ok(sdksNamed(`{ "sdk": { "version": "8.0.100" } }`).length === 0 && sdksNamed(`{ "MSBuild-SDKs": { "My.Sdk": "1.0.0" } }`).join() === 'msbuild-sdks: My.Sdk "1.0.0"' && sdksNamed(`{ // a comment\n "sdk": {} }`).join() === "a global.json that is not JSON",
-    "a global.json's SDKs from packages are named, the key in any case, and one that is not JSON is one form of its own");
+  ok(formsIn(`<Project><ItemGroup><_PackageToDownload Include="P" Version="1.0.0" /></ItemGroup><Import Project="Sdk.props" Sdk="S" MinimumVersion="1.0" /></Project>`).length === 2, "an item the SDK downloads by, and an Import of an SDK by its least version, are forms");
+  const json = (text) => globalForms(Buffer.from(text));
+  ok(json(`{ "sdk": { "version": "8.0.100", "rollForward": "latestFeature", "allowPrerelease": false } }`).length === 0 && json(`{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`).join() === 'msbuild-sdks: {"My.Sdk":"1.0.0"}'
+    && json(`{ "sdk": { "version": "10.0.100", "paths": [".dotnet", "$host$"], "Version": "x" } }`).join("|") === 'sdk.paths: [".dotnet","$host$"]|sdk.Version: "x"' && json(`{ "SDK": {}, "sdk": "x" }`).join("|") === 'SDK: {}|sdk: "x"',
+    "a global.json's every key but the SDK's own version, roll-forward and pre-release, by their exact names, is a form, its value whole");
+  const whole = json(`{ // a comment\n "sdk": {} }`);
+  ok(whole.length === 1 && /^a global\.json this check does not read whole, its bytes' sha256 [0-9a-f]{64}$/.test(whole[0]) && json(`{ // a comment\n "sdk": {}, "msbuild-sdks": {} }`)[0] !== whole[0]
+    && json(`{ "sdk": {}, "sdk": { "paths": ["x"] } }`)[0].startsWith("a global.json this check does not read whole") && json(`{ "a": { "k": 1, "k": 2 } }`)[0].startsWith("a global.json this check does not read whole")
+    && globalForms(Buffer.from([0xff, 0xfe, 0x7b, 0])).length === 1 && globalForms(NOT_A_FILE).join() === "a global.json this check does not read whole, no file of bytes" && json(`{ "a": ["k", "k"], "b": "{\\"k\\": 1, \\"k\\": 2}" }`).length === 2,
+    "one not JSON, not plain UTF-8, no file, or writing a key twice in one object is one line naming its bytes' hash, so any change to it is another line");
+  ok(isProgram(Buffer.from("MZ\x90\x00", "latin1")) && isProgram(Buffer.from("\x7fELF", "latin1")) && !isProgram(Buffer.from("<Project />")) && !isProgram("MZ"), "a program is known by its first bytes");
+
   ok(throws(() => nugetConfig({ nuget: { unread: [] } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [] } } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [" "] } } })) && nugetConfig({ nuget: { unread: { "a.props": ["imports x"] } } }).unread["a.props"].length === 1,
     "the config's \"nuget.unread\" is a map from a file to the lines of the forms declared there");
 }
@@ -723,17 +733,25 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   const DOWNLOAD = `<PackageDownload Include="Some.Pkg" Version="[1.0.0]" />`, IMPORT = `<Import Project="$(Elsewhere)/more.props" />`;
   inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`); inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`);
   let r = formCheck();
+  // (each form's line, as its failure prints it, which declares it)
+  const first = r, lineOf = (text) => first.failures.map(x => /as this line prints it \((.*)\), for the reviews/.exec(x)?.[1]).find(l => l?.startsWith(text));
   ok(r.failures.some(x => x.startsWith(`${DBP} holds what the read before the restore does not follow`) && x.includes(DOWNLOAD) && x.includes('"nuget.unread"')) && r.failures.some(x => x.startsWith(`${DBP} imports $(Elsewhere)/more.props, a file whose path this check cannot know without the build`))
-    && r.failures.some(x => x.startsWith('global.json names an SDK MSBuild takes from a package') && x.includes('msbuild-sdks: My.Sdk "1.0.0"')),
+    && r.failures.some(x => x.startsWith('global.json holds what the read before the restore does not read') && x.includes('msbuild-sdks: {"My.Sdk":"1.0.0"}')) && /^<PackageDownload Include="Some.Pkg" Version="\[1\.0\.0\]" \/> \(its text's sha256 [0-9a-f]{16}\)$/.test(lineOf("<PackageDownload")),
     "a download, an Import the check cannot follow and an SDK from a package that the pull request adds each fail, saying the line that declares it", JSON.stringify(r));
   r = formCheck(null, null);
   ok(r.failures.length === 0 && r.reports.filter(x => x.includes("(reported, and passes)")).length >= 3, "with no base, each is reported and passes", JSON.stringify(r));
   const after = check({ ships: [], nuget: { tools: [L], unread: { "src/Gone.props": ["imports x"] } } }, repo, restore(), tracked, process.env, { base: null, baseConfig: null, restored: true });
   ok(!after.failures.some(x => x.includes("nuget.unread")) && !after.reports.some(x => x.includes(DOWNLOAD) || x.includes("more.props") || x.includes("My.Sdk")), "after the restore, no form is read again, nor a line declared", JSON.stringify(after));
-  r = formCheck({ [DBP]: [DOWNLOAD, `imports  $(Elsewhere)/more.props`], "global.json": ['msbuild-sdks: My.Sdk "1.0.0"'] });
+  const DECLARED = lineOf("<PackageDownload");
+  r = formCheck({ [DBP]: [DECLARED.replace(" ", "  "), `imports  $(Elsewhere)/more.props`], "global.json": ['msbuild-sdks: {"My.Sdk":"1.0.0"}'] });
   ok(r.failures.length === 0 && r.reports.filter(x => x.includes(`(declared in the config's "nuget.unread": reported, and passes)`)).length === 3, "each declared word for word, its blanks aside, is reported and passes", JSON.stringify(r));
-  r = formCheck({ [DBP]: [DOWNLOAD, DOWNLOAD, "imports $(Elsewhere)/more.props"], "global.json": ['msbuild-sdks: My.Sdk "1.0.0"'], "src/Gone.props": ["imports x"] });
-  ok(r.failures.filter(x => x.startsWith(`the config's "nuget.unread" declares, for`)).length === 2 && r.failures.every(x => x.startsWith(`the config's "nuget.unread" declares, for`)), "a line declared that no form matches fails, one declared twice for one form and one for a file with none", JSON.stringify(r));
+  r = formCheck({ [DBP]: [DECLARED, DECLARED, "imports $(Elsewhere)/more.props"], "global.json": ['msbuild-sdks: {"My.Sdk":"1.0.0"}'], "src/Gone.props": ["imports x"], toString: ["imports y"] });
+  ok(r.failures.filter(x => x.startsWith(`the config's "nuget.unread" declares, for`)).length === 3 && r.failures.every(x => x.startsWith(`the config's "nuget.unread" declares, for`)), "a line declared that no form matches fails, one declared twice for one form and one for a file with none, whatever its name", JSON.stringify(r));
+  // (a form whose text differs from the one declared only in a line break where a blank stood is another form)
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD.replace(" Version", "\nVersion")}</ItemGroup>${IMPORT}</Project>`);
+  r = formCheck({ [DBP]: [DECLARED, "imports $(Elsewhere)/more.props"], "global.json": ['msbuild-sdks: {"My.Sdk":"1.0.0"}'] });
+  ok(r.failures.some(x => x.includes("Some.Pkg") && x.includes("Mend: ")) && r.failures.some(x => x.includes(`declares, for ${DBP}, ${DECLARED}`)), "a form that differs from the one declared only where a blank became a line break is another form, and fails", JSON.stringify(r));
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`);
   git("add", "-A"); git("commit", "-q", "-m", "forms");
   r = formCheck();
   ok(r.failures.length === 0 && r.reports.filter(x => x.includes("held before this check read it")).length === 3, "the same forms, as the base held them in the same files: reported, and pass", JSON.stringify(r));
@@ -741,6 +759,36 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   inRepo(DBP, `<Project><PropertyGroup><X>2</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}${TARGET}</Project>`);
   r = formCheck();
   ok(r.failures.length === 1 && r.failures[0].includes(TARGET) && r.reports.filter(x => x.includes("held before this check read it")).length === 3, "a target the pull request adds beside them fails, read whole, while what the base held still passes", JSON.stringify(r));
+  // (a form moved to another file, a second copy of one the base held, and a setting of the SDK's beyond its version,
+  // each fail; what the base held stays held)
+  const OTHER = "build/Other.props", withOther = [...tracked, OTHER];
+  const otherCheck = () => { const x = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), withOther, process.env, { base: "HEAD", baseConfig: null, fetched: true }); return x.failures.filter(f => !f.startsWith(L)); };
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup>${IMPORT}</Project>`); inRepo(OTHER, `<Project><ItemGroup>${DOWNLOAD}</ItemGroup></Project>`);
+  let fails = otherCheck();
+  ok(fails.length === 1 && fails[0].startsWith(`${OTHER} holds`) && fails[0].includes("Some.Pkg"), "a form moved to another file fails there", JSON.stringify(fails));
+  fs.rmSync(path.join(repo, OTHER));
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`);
+  fails = formCheck().failures;
+  ok(fails.length === 1 && fails[0].includes("Some.Pkg"), "a second copy of a form the base held once fails, the first held", JSON.stringify(fails));
+  inRepo(DBP, `<Project><PropertyGroup><X>1</X></PropertyGroup><ItemGroup>${DOWNLOAD}</ItemGroup>${IMPORT}</Project>`);
+  inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" }, "sdk": { "version": "10.0.100", "paths": [".dotnet", "$host$"] } }`);
+  fails = formCheck().failures;
+  ok(fails.length === 1 && fails[0].startsWith("global.json holds") && fails[0].includes('sdk.paths: [".dotnet","$host$"]'), "a global.json's folder of SDKs that the pull request adds fails, its SDK's version passing", JSON.stringify(fails));
+  inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`);
+  // (a program, by its first bytes, whatever its name: one the pull request adds fails, the first look lists it, the
+  // same bytes the base held pass, and other bytes at that path fail)
+  const DLL = "tools/Task.dll", dll = (n) => Buffer.concat([Buffer.from("MZ\x90\x00", "latin1"), Buffer.alloc(60, n)]);
+  inRepo(DLL, dll(1)); inRepo("tools/readme.bin", dll(2));
+  const programCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, "tools/readme.bin"], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
+  fails = programCheck();
+  const listed = run("--imports").stdout;
+  ok(fails.length === 2 && fails.every(f => /^tools\/(Task\.dll|readme\.bin) is a program, its bytes' sha256 [0-9a-f]{64}, which a restore may be made to load/.test(f) && f.includes("Mend: ")), "a program the pull request adds fails, whatever its name", JSON.stringify(fails));
+  git("add", "-A"); git("commit", "-q", "-m", "programs");
+  ok(run("--imports").stdout.split("\n").includes(DLL) && programCheck().length === 0, "the first look lists each program, and one the base held as it stands passes", listed);
+  inRepo(DLL, dll(3));
+  fails = programCheck();
+  ok(fails.length === 1 && fails[0].startsWith(`${DLL} is a program`), "and other bytes at its path fail", JSON.stringify(fails));
+  fs.rmSync(path.join(repo, "tools"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no programs");
   inRepo(DBP, `<Project><!DOCTYPE p><X /></Project>`);
   inRepo("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "x">]><Project />`);
   r = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, "build/Typed.props"], process.env, { base: "HEAD", baseConfig: null, fetched: true });
@@ -790,7 +838,7 @@ if (process.platform !== "win32") {
   const held = merged("other-file", () => inRepo("README.md", "another change\n"));
   ok(held.status === 0 && held.out.includes(`REPORT: ${CS} holds what the read before the restore does not follow`) && held.out.includes("held before this check read it"), "on a merge, a target the base held, beside a change to another file, passes reported", held.out);
   const added = merged("new-target", () => inRepo(CS, `<Project Sdk="Microsoft.NET.Sdk">${gen}<Target Name="More" AfterTargets="Build" /></Project>`));
-  ok(added.status === 1 && added.out.includes('<Target Name="More" AfterTargets="Build" />. Mend: '), "and a target the pull request adds beside it fails, saying its mend", added.out);
+  ok(added.status === 1 && /<Target Name="More" AfterTargets="Build" \/> \(its text's sha256 [0-9a-f]{16}\)\. Mend: /.test(added.out), "and a target the pull request adds beside it fails, saying its mend", added.out);
 }
 ok(unsaid.length === 0, "each failure read in this test says its mend", unsaid.join("\n"));
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the NuGet check`);

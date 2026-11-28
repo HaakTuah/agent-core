@@ -301,8 +301,9 @@ const RUN = {
     const said = Object.fromEntries(fs.readFileSync(output, "utf8").split(/\r?\n/).filter(l => l.includes("=")).map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
     if (said.run === "false") return;
     // (before the restore, which runs the pull request's own build files: each package's file held to its lock file's
-    // content hash, and its licence read from it, and every build file read as committed, in a step no build of the
-    // pull request's has run in, whatever the look ran: it ran a build only where nothing it reads changed from the base)
+    // content hash, and its licence read from it, and the project's files read as committed, whatever the look ran: it
+    // ran a build only where nothing it reads changed from the base, so the base's build files, which gain nothing the
+    // read judges by what else they run)
     if (!check("Every locked package and tool, fetched before the restore and held to its list", () => {
       const fetched = path.join(temp, "nuget-fetched");
       const got = node(coreAt, "nuget-fetch.mjs", [o.nuget, "--into", fetched]);
