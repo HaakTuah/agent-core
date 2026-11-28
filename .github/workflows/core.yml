@@ -433,7 +433,8 @@ jobs:
           # The check reads the config's form without ajv, the one package of the core's it would read, by its own checks
           # of that form; no step follows)
           git reset -q --hard HEAD && git clean -ffdxq || :
-          # (git failing to list or read a folder counts as something standing there: fails closed)
+          # (git failing or warning that it cannot read a folder, and a submodule folder that cannot be listed, count as
+          # something standing there: fails closed)
           bare() {
             local e p f s l
             f=$(mktemp) && git -C "${1:-.}" ls-files -s -z > "$f" || return 1
@@ -448,7 +449,7 @@ jobs:
           }
           top=$(git status --porcelain --ignored --untracked-files=all --ignore-submodules=all 2>&1) || top="git could not read the checkout"
           if [ -n "$top" ] || ! bare ""; then
-            echo "FAIL the checkout still holds what git does not know once what HEAD holds was put back (a file a step before wrote, or a folder git records as a submodule that holds files or is a link), or git could not read it, so the NuGet check's restore does not run. Mend: keep each folder git records as a submodule out of what a step before writes (an install's folder of packages), or take that submodule out; then run the check again"; exit 1
+            echo "FAIL the checkout still holds what git does not know once what HEAD holds was put back (a file a step before wrote, or a folder git records as a submodule that holds files, is a link or cannot be listed), or git could not read it or warned, so the NuGet check's restore does not run. Mend: keep each folder git records as a submodule out of what a step before writes (an install's folder of packages), or take that submodule out; then run the check again"; exit 1
           fi
           set -- nuget --nuget "$CONFIG" --base "$BASE"; [ "$ADVISORY" != true ] || set -- "$@" --advisory
           node "$CORE_AT"scripts/checks.mjs "$@"
