@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mended } from "../scripts/mend.mjs";
-import { foldedLoop, inTime, scratchDir } from "../scripts/scratch-core.mjs";
+import { linkedAway, inTime, scratchDir } from "../scripts/scratch-core.mjs";
 import { FLOOR, MAKE, START } from "../scripts/reading.mjs";
 import { OPEN, candidates, conditions, cuts, tasks, total } from "../scripts/read-total.mjs";
 
@@ -124,7 +124,7 @@ ok(inProject.status === 0 && /^not run: the total read reads the core's own repo
 
 // (a link the system reads out of the tree, though its spelling stays inside: no file)
 const folded = scratchDir("read-total-folded-");
-if (foldedLoop(folded, "AGENTS.md")) {
+if (linkedAway(folded, "AGENTS.md")) {
   const said = inTime(`import { tree } from ${JSON.stringify(new URL("../scripts/read-total.mjs", import.meta.url).href)};\nconsole.log(JSON.stringify(tree(null, ${JSON.stringify(folded)}).read("AGENTS.md")));`);
   ok(said?.trim() === "null", "a link the system reads out of the tree, though its spelling stays inside, is read as no file", said ?? "stopped past its time");
 }

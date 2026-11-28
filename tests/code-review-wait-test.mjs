@@ -265,13 +265,20 @@ try {
   // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a pin
   // moved beside a change under the path that manifest names is no sync; in a project's checkout it is)
   const named = copied("vendor/the-core/");
-  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT }), copy = checkout(dir, "copy", { "core-manifest.md": named });
+  const rulesLine = { "SECURITY.md": "**the rule files:** `docs/rules.md`;\n" };
+  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT, ...rulesLine }), copy = checkout(dir, "copy", { "core-manifest.md": named, ...rulesLine });
   const moved = [manifest, md("vendor/the-core/scripts/x.mjs")];
   ok(run(counts, [], { ADVISORY: "false" }, [line], moved, own).status.state === "pending" && run(counts, [], { ADVISORY: "false" }, [line], moved, copy).status.state === "success",
     "the core's own checkout, with a manifest at its root, holds no copy: a pin moved beside a change under the path it names needs its code review; a project's is a sync");
   ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("core/.github/notes.md")], own).status.state === "pending" && run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("vendor/the-core/.github/notes.md")], copy).status.state === "success",
     "and holding no copy, it leaves nothing aside, core/ included: a file there that runs by itself is no queue line; under a project's copy it is");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
+  // (a project whose SECURITY.md has no line of its rule files: its own list cannot be read, so the wait holds, saying the mend)
+  const lineless = checkout(dir, "lineless", { "SECURITY.md": "# Security\n" });
+  let held = null;
+  writeFileSync(join(dir, "pull.json"), JSON.stringify(counts)); writeFileSync(join(dir, "commits.json"), JSON.stringify([line])); writeFileSync(join(dir, "files.json"), JSON.stringify([md("docs/rules.md")]));
+  try { execFileSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), join(dir, "commits.json"), join(dir, "files.json")], { cwd: lineless, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ADVISORY: "false" } }); } catch (e) { held = e; }
+  ok(held?.status === 1 && mended(String(held.stderr)) && /no "the rule files:" line/.test(String(held.stderr)), "where the project's SECURITY.md names no rule files, it does not take the list as empty: it fails, so the wait holds, saying the mend", held?.stderr);
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
   ok(usage === 2, "with no files named, it says how it is run");

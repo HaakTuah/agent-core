@@ -183,6 +183,10 @@ else {
   const dir = project("within");
   const inside = fetchPinned({ project: dir, list: [{ ...good, sha512: right.sum }], home: dir, env: within.env, ...linux }).join();
   ok(/would stand inside the project/u.test(inside) && within.log() === null, "a home folder inside the project fetches nothing there", inside);
+  // (a home folder that is a link inside the project leading nowhere: where it leads cannot be told, so it is refused)
+  fs.symlinkSync(path.join(dir, "gone"), path.join(dir, "home-link"));
+  const unsure = fetchPinned({ project: dir, list: [{ ...good, sha512: right.sum }], home: path.join(dir, "home-link"), env: within.env, ...linux }).join();
+  ok(/would stand inside the project, or where a link on its way leads cannot be told/u.test(unsure) && within.log() === null && !fs.existsSync(path.join(dir, "gone")), "nor does one reached through a link inside it that leads nowhere", unsure);
 
   // (the entries --entry prints, from the publisher's release notes)
   const notes = { releases: [{ sdks: [{ version: V, files: [{ rid: RID, url: url(), hash: "B".repeat(128) }, { rid: "linux-arm64", url: url(V, "linux-arm64"), hash: "c".repeat(128) }, { rid: "win-x64", url: "https://x", hash: "d" }] }] }] };

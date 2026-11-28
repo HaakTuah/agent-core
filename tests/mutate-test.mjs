@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mended } from "../scripts/mend.mjs";
 import { faults, report, testsOf } from "../scripts/mutate.mjs";
-import { OWNER, foldedLoop, scratchDir } from "../scripts/scratch-core.mjs";
+import { OWNER, linkedAway, scratchDir } from "../scripts/scratch-core.mjs";
 
 let failed = 0, count = 0;
 const ok = (cond, what, detail = "") => { count++; if (cond) console.log(`ok   ${what}`); else { failed++; console.error(`FAIL ${what}${detail && `\n     ${String(detail).slice(0, 1500).replace(/\n/g, "\n     ")}`}`); } };
@@ -101,7 +101,7 @@ try {
   git("add", "src/ws/index.mjs", "test/ws-test.mjs");
   // (and beside it, a link the system reads out of the project, though its spelling stays inside: the copies are made
   // as for any link out)
-  foldedLoop(dir, "node_modules/loop");
+  linkedAway(dir, "node_modules/loop");
   const ws = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/ws/index.mjs"], { cwd: dir, encoding: "utf8", timeout: 300000, killSignal: "SIGKILL" });
   const wsFault = JSON.parse(fs.readFileSync(out, "utf8")).files["src/ws/index.mjs"]?.mutants.find(m => m.replacement === "false");
   ok(ws.status === 0 && wsFault?.status === "Killed" && fs.readFileSync(path.join(dir, "src/ws/index.mjs"), "utf8").includes("true"), "a test that imports the project's own workspace package through node_modules runs against the copy's faults", ws.stdout + ws.stderr + JSON.stringify(wsFault));

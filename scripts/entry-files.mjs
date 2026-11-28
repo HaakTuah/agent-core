@@ -82,19 +82,24 @@ const throughSubmodule = file => {
 const toolsInSubmodule = () => { inSubmodule(""); return [...FOLDERS, ...TOOL_FILES.filter(f => !ENTRY.some(e => e.file === f))].filter(f => heldBySubmodule(f, isLinkHere, linkTextHere, isFolderHere, gitlinks)); };
 // Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit (followLinks): written
 // relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link
-// alike where a `..` is read as Linux and macOS read it (followLinks says what holds on Windows).
+// alike where a `..` is read as Linux and macOS read it (followLinks says what holds on Windows). (isFolderHere reads a
+// part with lstat, which follows no link: it is asked only of a path whose every part the walk found to be no link, so
+// on Linux and macOS it reads as the system does, and no case there reads otherwise.)
 const asTheBaseReads = file => followLinks(clean(file), isLinkHere, linkTextHere, isFolderHere) !== null;
+// (the links on the file's way, the file itself left out, as the walk meets them: those a failure names to mend)
+const wayHere = file => { const passed = []; followLinks(clean(file), isLinkHere, linkTextHere, isFolderHere, passed); return passed.filter(p => p !== clean(file)); };
 
 // What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line, off }], `off`
 // why its tool would not load it at all (every file is then missing), or null.
-// `read(file)` gives a file's text, or null where it is not there.
+// `read(file)` gives a file's text, or null where it is not there. Each entry file is read though AGENTS.md is not, so
+// that a reader that notes what stands unread meets each.
 export function lacking(read) {
-  const agents = read(AGENTS);
+  const agents = read(AGENTS), texts = ENTRY.map(e => read(e.file));
   if (agents === null) return [];
   const list = ENTRY[0].pulls(agents).map(clean);
   const out = [];
-  for (const e of ENTRY) {
-    const text = read(e.file);
+  for (const [i, e] of ENTRY.entries()) {
+    const text = texts[i];
     if (text === null) continue;
     const off = e.off(text);
     if (off) { out.push({ file: e.file, tool: e.tool, missing: [], line: e.line, off }); continue; }
@@ -107,17 +112,20 @@ export function lacking(read) {
 }
 
 // The failures, each a line with its mend, and the notes: what `base` (a commit, or null) already lacked is a note.
+// Where `base` carries `held` (placeAt's), an entry file or AGENTS.md it held but did not read, past the bound or
+// behind a link it does not follow, may have lacked anything, so what the head lacks there is a note too.
 export function verdict(head, base = null) {
   const was = new Set((base ? lacking(base) : []).flatMap(l => [...l.missing.map(p => `${l.file}\0${p}`), ...(l.off ? [`${l.file}\0off`] : [])]));
+  const unread = f => Boolean(base?.held?.(f)) && base(f) === null, old = (file, key) => was.has(`${file}\0${key}`) || unread(AGENTS) || unread(file);
   const fails = [], notes = [];
   for (const l of lacking(head)) {
     if (!l.off) continue;
     const said = `${l.file} (${l.tool}'s entry file) is not loaded at a session's start: ${l.off}`;
-    (was.has(`${l.file}\0off`) ? notes : fails).push(said);
+    (old(l.file, "off") ? notes : fails).push(said);
   }
   for (const l of lacking(head)) for (const p of l.missing) {
     const said = `${l.file} (${l.tool}'s entry file) pulls in none of \`${p}\`, which ${AGENTS} names on an @ line, so a session of ${l.tool} would not read it at its start. Mend: add the line ${l.line(p)} to ${l.file}`;
-    (was.has(`${l.file}\0${p}`) ? notes : fails).push(said);
+    (old(l.file, p) ? notes : fails).push(said);
   }
   return { fails, notes };
 }
@@ -129,11 +137,12 @@ if (guard(import.meta.url)) {
   // (a file that stands here but that ownText refuses, that lies in a submodule or is reached through a link into one, or that a link on its way written from
   // a root or climbing above the project's root reaches, is one no check can read: it fails where the base read it or held nothing there, as
   // the pull request's own doing, and is noted where the base held it unread too)
-  const unread = new Set(), place = base ? placeAt(base) : null, was = place ? readAt(base, place, { bound: BOUND }) : null;
+  const unread = new Set(), place = base ? placeAt(base) : null, was = place ? Object.assign(readAt(base, place, { bound: BOUND }), { held: place.held }) : null;
   const here = file => { const text = !throughSubmodule(file) && asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
   const read = verdict(here, was);
   for (const f of unread) {
-    const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, outside any submodule, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no submodule and no such link on its way`;
+    const way = wayHere(f).map(p => `\`${p}\``).join(", then ");
+    const said = `${f} stands here but is not read${way ? `, reached through the link ${way}` : ""}: it is no regular file of the project's own of at most 1 MB, outside any submodule, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no submodule and no such link on its way${way ? ` (here ${way})` : ""}`;
     (core || (was && (was(f) !== null || !place.held(f))) ? read.fails : read.notes).push(said);
   }
   // (a tool's folder or file a submodule holds fails, where the base's submodules held none of it, as the pull request's

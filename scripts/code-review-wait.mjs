@@ -51,7 +51,7 @@
 //         Codex's code review found anything blocking.
 import { readFileSync } from "node:fs";
 import { CORE } from "./core-address.mjs";
-import { copyHeld } from "./core-path.mjs";
+import { copyHeld, coreItself } from "./core-path.mjs";
 import { blockingOf, codexFind } from "./review-comments.mjs";
 import { formOf, marksWait } from "./review-marks.mjs";
 import { RULES, inToolFolder, ruleFiles, toolFolders, wayLinks } from "./rule-files.mjs";
@@ -207,10 +207,12 @@ if (guard(import.meta.url)) {
     try { return JSON.parse(readFileSync(file, "utf8")); }
     catch (e) { console.error(`FAIL: scripts/code-review-wait.mjs could not read ${file} as JSON (${e.code ?? e.name}). Mend: write it again from the GitHub API, as the security-review workflow does, and run the check again`); process.exit(1); }
   };
-  // (the project's own rule files, where its SECURITY.md names them; none read, where it names none)
+  // (the project's own rule files, as its SECURITY.md names them: where it names none, the wait holds, saying the mend,
+  // since a list read as empty would let a change to one pass as docs alone; the core's own repository names none there,
+  // every file of it protected, and its list stays empty)
   let rules = [];
+  try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch (e) { if (!coreItself(".")) { console.error(`FAIL: ${e.message}`); process.exit(1); } }
   // (and each link on the way to a tool's folder or file or a floor file, which a pull request may point elsewhere)
-  try { rules = ruleFiles(undefined, undefined, { tools: true }); } catch { rules = []; }
   try { rules = rules.concat(wayLinks()); } catch { /* (none read) */ }
   // (and the core's copy, at the path the default branch's manifest names, checked out here, none in the core's own
   // repository: core-path.mjs)

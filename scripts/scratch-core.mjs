@@ -86,9 +86,9 @@ export function scratchDir(prefix) {
 /** A link at `<dir>/<at>` that the system reads out of `dir`, through a folder link beside it, as the file "away" of a
  *  scratch folder of its own, though its spelling stays inside: for a test that a check reads such a path as the
  *  system does. Null on Windows, which reads a `..` by its spelling; else the file it leads to. */
-export function foldedLoop(dir, at) {
+export function linkedAway(dir, at) {
   if (process.platform === "win32") return null;
-  const away = scratchDir("folded-loop-"), name = path.basename(at), from = path.dirname(path.join(dir, at));
+  const away = scratchDir("linked-away-"), name = path.basename(at), from = path.dirname(path.join(dir, at));
   fs.mkdirSync(path.join(away, "deep"));
   fs.writeFileSync(path.join(away, name), "away\n");
   fs.mkdirSync(from, { recursive: true });

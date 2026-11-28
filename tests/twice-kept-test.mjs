@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CORE } from "../scripts/core-address.mjs";
-import { foldedLoop, inTime, tally } from "../scripts/scratch-core.mjs";
+import { linkedAway, inTime, tally } from "../scripts/scratch-core.mjs";
 import { CALL, LONE, RUN, fetched, git, project, run, write } from "../scripts/twice-scratch.mjs";
 
 const { ok, done } = tally();
@@ -80,7 +80,7 @@ for (const [form, [file, content]] of Object.entries(FORMS)) {
 // A link the system reads out of the project, though its spelling stays inside, is a link.
 {
   const dir = project("folded");
-  if (foldedLoop(dir, "loop.md")) {
+  if (linkedAway(dir, "loop.md")) {
     const said = inTime(`import { linked } from ${JSON.stringify(new URL("../scripts/twice-files.mjs", import.meta.url).href)};\nconsole.log(linked({ root: ${JSON.stringify(dir)} }, "loop.md"));`);
     ok(said?.trim() === "true", "a link the system reads out of the project, though its spelling stays inside, is read as a link", said ?? "stopped past its time");
   }

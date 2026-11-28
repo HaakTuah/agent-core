@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unfolded, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aLogin, aRepository, firstLink, inProject, asText, leadsOut, liesOutside, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unfolded, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -51,6 +51,11 @@ try {
       "a path given with a `..` after a folder link out of the project leads out exactly where a read of it leads outside, also where it does not stand yet, though its spelling stays inside");
     ok([["nowhere", "..", "..", "elsewhere", "new.json"], ["inner", "nowhere", "..", "..", "..", "elsewhere"], ["nowhere", ".", "new.json"]].every(parts => leadsOut(project, parts.join(path.sep))),
       "a path whose `..` or `.` stands after a part that does not stand leads out, since a write that makes its folders could follow it out of the project");
+    ok([["nowhere", "..", "..", "elsewhere", "new.json"], ["nowhere", ".", "new.json"]].every(parts => !liesOutside(project, parts.join(path.sep))) && liesOutside(project, path.join(elsewhere, "new.json"))
+      && liesOutside(project, path.join(project, "away", "new.json")) && !liesOutside(project, path.join(project, "inner", "own.json")) && !liesOutside(path.join(project, "gone"), elsewhere),
+      "yet it does not surely lie outside: a check that allows only what lies outside refuses it, as it refuses a path inside and any path against a root that is not there, and allows one outside, also through a folder link");
+    ok(firstLink(["away", "other.json"].join(path.sep)) === "away" && firstLink(["inner", "own.json"].join(path.sep)) === null && firstLink(["away", "nothere", "x"].join(path.sep)) === "away" && firstLink(["nothere", "x"].join(path.sep)) === null,
+      "the first link on a path's way is the one named, none where the path holds no link or stops before one");
     if (process.platform === "win32") {
       const drive = project.slice(0, 2), other = drive.toUpperCase() === "C:" ? "D:" : "C:";
       ok(unfolded(`${drive}inner\\own.json`) === path.join(project, "inner", "own.json") && !leadsOut(project, `${drive}inner\\own.json`) && leadsOut(project, `${drive}away\\other.json`) && leadsOut(project, `${other}own.json`),
@@ -59,7 +64,8 @@ try {
   } finally { process.chdir(was); }
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
-    ok(leadsOut(project, path.join(project, "dangling.json")) && leadsOut(project, `${path.join(project, "dangling.json")}${path.sep}`), "a link that leads nowhere leads out, also named with a separator at its end");
+    ok(leadsOut(project, path.join(project, "dangling.json")) && leadsOut(project, `${path.join(project, "dangling.json")}${path.sep}`) && !liesOutside(project, path.join(project, "dangling.json", "x.json")),
+      "a link that leads nowhere leads out, also named with a separator at its end, yet does not surely lie outside, nor does a path under it");
     fs.symlinkSync(path.join(elsewhere, "other.json"), path.join(project, "..x.json"));
     const was = process.cwd();
     try {
