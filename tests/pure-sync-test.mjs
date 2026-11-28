@@ -217,7 +217,8 @@ for (const f of planted) fs.rmSync(f);
   // yet proven the repository's own, nor by the look at whether the core moved, run in the project's own clone: a git
   // and a gh of the branch's at its root, "." first on the PATH, leave their mark for none of them; on Windows Node's
   // own program as git.exe and gh.exe, which a preloaded file makes leave it where it starts from that folder alone,
-  // elsewhere a script. Each planted program is run once first, so a mark that cannot be left proves nothing)
+  // elsewhere a script. Each planted program is run once first, so a mark that cannot be left proves nothing; the scripts
+  // run from this core, whose packages are installed, so that each gets as far as its programs)
   const mark = path.join(tmp, "planted-ran"), win = process.platform === "win32", at = ["git", "gh"].map(n => path.join(p, win ? `${n}.exe` : n));
   const env = { ...dotFirst };
   if (win) {
@@ -226,9 +227,9 @@ for (const f of planted) fs.rmSync(f);
     fs.writeFileSync(preload, `const path = require("path"); if (path.dirname(process.execPath).toLowerCase() === ${JSON.stringify(p.toLowerCase())}) { require("fs").writeFileSync(${JSON.stringify(mark)}, "ran"); process.exit(1); }\n`);
     env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --require "${slash(preload)}"`.trim();
   } else for (const f of at) fs.writeFileSync(f, `#!/bin/sh\necho ran > "${slash(mark)}"\nexit 1\n`, { mode: 0o755 });
-  const leaves = at.every(f => { spawnSync(f, ["--version"], { cwd: p, env }); const left = fs.existsSync(mark); fs.rmSync(mark, { force: true }); return left; });
+  const leaves = at.every(f => { spawnSync(f, ["-e", "0"], { cwd: p, env }); const left = fs.existsSync(mark); fs.rmSync(mark, { force: true }); return left; });
   const runs = [["queue-only.mjs", path.join(tmp, "no-pull.json"), path.join(tmp, "no-files.json")], ["comment-only.mjs"], ["core-moved.mjs"]]
-    .map(([f, ...args]) => spawnSync(process.execPath, [path.join(theCore, "scripts", f), ...args], { cwd: p, env: { ...env, REPO: "someone/project", GITHUB_REPOSITORY: "someone/project" }, encoding: "utf8", timeout: 120000 }));
+    .map(([f, ...args]) => spawnSync(process.execPath, [path.join(root, "scripts", f), ...args], { cwd: p, env: { ...env, REPO: "someone/project", GITHUB_REPOSITORY: "someone/project" }, encoding: "utf8", timeout: 120000 }));
   const ranHere = fs.existsSync(mark);
   for (const f of at) fs.rmSync(f);
   fs.rmSync(mark, { force: true });
