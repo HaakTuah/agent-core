@@ -30,9 +30,17 @@ COLONS='s/:\([^ -~]*:\)/: \1/' HASHES='s/#\([^ -~]*#[^ -~]*\[\)/# \1/g'
 # (any other ASCII control byte shown as "?", as oneLine shows it; a line break too in one name, named)
 shown() { printf '%s\n' "$1" | LC_ALL=C tr '\000-\011\013-\037\177' '?' | LC_ALL=C sed -e ':a' -e "$COLONS" -e 'ta' -e "$HASHES"; }
 named() { shown "${1//$'\n'/?}"; }
+# (what holds makes, it removes on every way out, its failures' returns included; nothing else: each name only where it
+# was made, and its stamp and config by the names given to them)
 holds() {
-  local empty config stamp project out codes id projects locks records
-  empty=$(mktemp -d) stamp=$(mktemp)
+  local empty= stamp= rc=0
+  empty=$(mktemp -d) && stamp=$(mktemp) && restores || rc=1
+  [ -z "$stamp" ] || rm -f -- "$stamp"
+  [ -z "$empty" ] || rm -rf -- "$empty" "$empty.config"
+  return "$rc"
+}
+restores() {
+  local config project out codes id projects locks records
   # (a NuGet config of its own and nothing else, so that no NuGet.Config of the project's has a say: one that
   # maps packages to their sources maps none to the empty source, and NuGet would name that, not a package
   # not found; #380)

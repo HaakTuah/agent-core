@@ -344,7 +344,9 @@ const RUN = {
       return verdict(passed);
     })) return;
     // (after the restore, nothing of git's is read for the base, which the restore could have rewritten: each comparison
-    // with it was made before, by the read above; with no project to restore, one read of an empty folder)
+    // with it was made before, by the read above, whose base is the merge's first parent (none on a head alone), the
+    // look's too where --base is HEAD^1, as the workflows give it, and not where a run by hand gives another; with no
+    // project to restore, one read of an empty folder)
     check("Every package one exact version, and under a licence on its list", () => {
       if (each.restoredAny) return each.reads;
       const empty = fs.mkdtempSync(path.join(temp, "nuget-packages-"));
