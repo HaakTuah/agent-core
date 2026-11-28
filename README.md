@@ -345,18 +345,18 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
      job of the project's own that already runs holds its packages (`setup/sync-notes/`, "16 November 2026, the NuGet
      check where it can matter"). Like the signature check, it first looks whether the pull request changes anything
      NuGet reads (its workflow's header lists what), and passes without a restore where it changes none; any doubt runs
-     it. Before the restore, which runs the pull request's own build files, `nuget-fetch.mjs` fetches every package the
+     it. A restore runs the pull request's own build files, so none runs, the first look's own neither, unless the run
+     proves the code is the repository's own: a pull request from another repository that changes what NuGet reads
+     fails, with the mend that the owner brings the change into a branch of the repository. Before the restore, `nuget-fetch.mjs` fetches every package the
      lock files name, holds each to its lock file's content hash and reads its licence from it, so no build the pull
      request changed has run beside that verdict; the tools a manifest of dotnet's names (`dotnet-tools.json`, in `.config/` or any folder) are
      fetched and held the same way, each at one exact version and to the list for tools that only run (what is wrong
      with a tool the pull request's base held, never read before this release, is reported, not failed). That read runs
      before every restore of the check's, and reads the project's files as committed, where the project has a .NET
      project file: a target, a task, a download or an SDK from a package, a setting that turns how the restore runs or
-     where a build imports a project's generated files from, an Import it cannot follow, a global.json's setting beyond
-     the SDK's version, or a program (by its first bytes, or a file git records as one that runs), fails there unless
-     the base held it in the same file or the config's "nuget.unread" declares it by the exact line the failure prints,
-     for the reviews to read what it brings in; a program that leads to no file of bytes of the project's own, or a
-     path the base held as one that now does, fails whatever is declared.
+     where a build imports a project's generated files from, an Import it cannot follow, or a global.json's setting
+     beyond the SDK's version, fails there unless the base held it in the same file or the config's "nuget.unread"
+     declares it by the exact line the failure prints, for the reviews to read what it brings in.
    - **The security-review check:** a project has a `security-review.yml` of its own, with the triggers and the three
      permissions its template has: the core's gives each open pull request's head commit the status `security-review`,
      which says whether its security review has run (floor rule 8), by the summary Codex's own app keeps on the pull

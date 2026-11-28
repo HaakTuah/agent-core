@@ -61,6 +61,14 @@ const run = (dir, args, extra = {}) => {
   const none = run(dir, ["copies", "--copies", "c.json", "--sizes", "s.json", "--base", ""]);
   ok(/^ran copies\.mjs \[c\.json\] COPIES_BASE=(,|$)/m.test(none.out), "with the base given empty, as on a push to main, each check is given none", none.out);
 }
+// (a run in a workflow on a pull request whose event file names its head repository: this one by default, so the
+// code is proven the repository's own, as checks.mjs's ownCode reads it)
+let events = 0;
+const inWorkflow = ({ head = "owner/project", name = "pull_request" } = {}) => {
+  const file = path.join(tmp, `event-${++events}.json`);
+  fs.writeFileSync(file, JSON.stringify({ pull_request: head === null ? { head: {} } : { head: { repo: { full_name: head } } } }));
+  return { GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: name, GITHUB_EVENT_PATH: file, GITHUB_REPOSITORY: "owner/project" };
+};
 // its own failures say their mend
 {
   const dir = project();
@@ -185,7 +193,7 @@ if (process.platform !== "win32") {
   const bin = path.join(tmp, "no-dotnet-bin");
   fs.mkdirSync(bin, { recursive: true });
   for (const p of ["bash", "git"]) fs.symlinkSync(execFileSync("bash", ["-c", `command -v ${p}`], { encoding: "utf8" }).trim(), path.join(bin, p));
-  const lacked = () => run(dir, [], { BASE_SHA: base, PATH: bin });
+  const lacked = () => run(dir, [], { BASE_SHA: base, PATH: bin, ...inWorkflow() });
   const alone = lacked();
   ok(alone.status === 127 && /^dotnet could not be started \(spawnSync dotnet ENOENT\)\.$/m.test(alone.out) && /^FAIL 2 of \d+ checks could not run here, since this machine lacks dotnet: Restore each project file from its lock file alone; Restore each project file from its lock file alone\. Mend: /m.test(alone.out)
     && !/A restore from a lock file failed/.test(alone.out) && !/checks failed/.test(alone.out) && mended(alone.out), "nuget: a restore whose dotnet is not on this machine did not run, in each of two calls: it says so with its mend and exits 127, as a shell does for a command not found", alone.out);
@@ -219,7 +227,7 @@ if (args.includes("--restored") && process.env.FAIL_READ && args.join(" ").inclu
 `);
   for (const built of ["true", "false"]) {
     fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), `echo "run=true" >> "$GITHUB_OUTPUT"\necho "built=${built}" >> "$GITHUB_OUTPUT"\n`);
-    const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}` });
+    const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}`, ...inWorkflow() });
     const after = r.out.indexOf("ran dotnet restore"), runs = [...r.out.matchAll(/^ran nuget\.mjs \[checks\/licences\.json --packages (.*)\]/gm)];
     const before = runs.filter(m => m.index < after), reads = runs.filter(m => m.index > after), restores = [...r.out.matchAll(/^ran dotnet restore (\S+), folders standing: +(\d+), caches own$/gm)];
     ok(r.status === 0 && before.length === 1 && before.every(m => / --fetched$/.test(m[1])) && restores.map(m => m[1]).join() === "./src/A/A.csproj,./src/B/B.csproj"
@@ -229,10 +237,29 @@ if (args.includes("--restored") && process.env.FAIL_READ && args.join(" ").inclu
   // (no earlier project's folder stands as a later one restores: where each restore passed, where the first failed, and
   // where the first one's read failed)
   for (const [what, extra] of [["each passed", {}], ["the first restore failed", { FAIL_RESTORE: "src/A/" }], ["the first read failed", { FAIL_READ: "src/A/" }]]) {
-    const r = run(dir, ["nuget", "--nuget", "checks/licences.json"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}`, ...extra });
+    const r = run(dir, ["nuget", "--nuget", "checks/licences.json", "--own-repository"], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}`, ...extra });
     const standing = [...r.out.matchAll(/^ran dotnet restore (\S+), folders standing: +(\d+), caches own$/gm)].map(m => Number(m[2]));
     ok(standing.length === 2 && standing.every(n => n === 1) && r.status === (what === "each passed" ? 0 : 1),
       `nuget: as each project restores, only its own folder of packages, with NuGet's caches and scratch folder inside it, stands (${what})`, r.out);
+  }
+  // (no restore runs, nor the read before it, unless the code is proven the repository's own: in a workflow, a pull
+  // request whose event file names this repository as its head's; elsewhere, --own-repository. Where the look finds a
+  // change, the check fails saying its mend; where it finds none, it passes; the look is told whether it may restore)
+  fs.writeFileSync(path.join(dir, "core/scripts/nuget-look.sh"), 'echo "ran the look, OWN=$OWN"\necho "run=$LOOK_RUN" >> "$GITHUB_OUTPUT"\n');
+  const proven = (args, extra, look = "true") => run(dir, ["nuget", "--nuget", "checks/licences.json", ...args], { BASE_SHA: base, PATH: `${bin}${path.delimiter}${env.PATH}`, LOOK_RUN: look, ...extra });
+  const refused = r => r.status === 1 && /^ran the look, OWN=$/m.test(r.out) && /^FAIL this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran\. Mend: the owner brings the change into a branch of the repository/m.test(r.out)
+    && !/^ran (nuget\.mjs \[checks|dotnet restore)/m.test(r.out) && mended(r.out);
+  for (const [what, args, extra] of [["a pull request from another repository", [], inWorkflow({ head: "stranger/project" })], ["one whose head repository is missing", [], inWorkflow({ head: null })],
+    ["a push", [], inWorkflow({ name: "push" })], ["a pull request with no event file", [], { ...inWorkflow(), GITHUB_EVENT_PATH: path.join(tmp, "no-event.json") }],
+    ["--own-repository in a workflow, for another repository's pull request", ["--own-repository"], inWorkflow({ head: "stranger/project" })], ["a run by hand without --own-repository", [], {}]]) {
+    const r = proven(args, extra);
+    ok(refused(r), `nuget: ${what} changing what NuGet reads fails with its mend, and no restore runs, nor the read before it`, r.out);
+  }
+  const quiet = proven([], inWorkflow({ head: "stranger/project" }), "false");
+  ok(quiet.status === 0 && /^ran the look, OWN=$/m.test(quiet.out) && !/^ran (nuget\.mjs \[checks|dotnet restore)/m.test(quiet.out), "nuget: and one that changes nothing NuGet reads passes, nothing restored", quiet.out);
+  for (const [what, args, extra] of [["a pull request of this repository's own", [], inWorkflow()], ["a run by hand with --own-repository", ["--own-repository"], {}]]) {
+    const r = proven(args, extra);
+    ok(r.status === 0 && /^ran the look, OWN=true$/m.test(r.out) && /^ran dotnet restore/m.test(r.out), `nuget: ${what} restores, the look told it may`, r.out);
   }
 }
 // the signature check's install, under an npm that reads none of --allow-git, --allow-remote and --allow-file (npm 10,

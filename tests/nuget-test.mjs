@@ -9,7 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { NOT_A_FILE, REGISTRY, check as checked, formsIn, importPath, imported, importsOf, lockPackages, plainText, projectFilesByContent, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, globalForms, isProgram, sourcesOf, executables } from "../scripts/nuget.mjs";
+import { NOT_A_FILE, REGISTRY, check as checked, formsIn, importPath, imported, importsOf, lockPackages, plainText, projectFilesByContent, projectRooted, readProject, manifestLicence, nugetConfig, projectFiles, globalForms, sourcesOf } from "../scripts/nuget.mjs";
 import { CORE } from "../scripts/core-address.mjs";
 import { fetchAll } from "../scripts/nuget-fetch.mjs";
 import { packagesOf } from "../scripts/lookup.mjs";
@@ -751,11 +751,6 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
     && json(`{ "sdk": {}, "sdk": { "paths": ["x"] } }`)[0].startsWith("a global.json this check does not read whole") && json(`{ "a": { "k": 1, "k": 2 } }`)[0].startsWith("a global.json this check does not read whole")
     && globalForms(Buffer.from([0xff, 0xfe, 0x7b, 0])).length === 1 && globalForms(NOT_A_FILE).join() === "a global.json this check does not read whole, no file of bytes" && json(`{ "a": ["k", "k"], "b": "{\\"k\\": 1, \\"k\\": 2}" }`).length === 2,
     "one not JSON, not plain UTF-8, no file, or writing a key twice in one object is one line naming its bytes' hash, so any change to it is another line");
-  ok(isProgram(Buffer.from("MZ\x90\x00", "latin1")) && isProgram(Buffer.from("\x7fELF", "latin1")) && !isProgram(Buffer.from("<Project />")) && !isProgram("MZ"), "a program is known by its first bytes");
-  const broken = scratchDir("nuget-test-index-");
-  spawnSync("git", ["init", "-q", broken], { env }); fs.writeFileSync(path.join(broken, ".git", "index"), "not an index");
-  ok(executables(scratchDir("nuget-test-bare-")).size === 0 && throws(() => executables(broken)), "outside a repository no file runs by git's mode, and where git cannot list its files the check fails, never finding none");
-
   ok(throws(() => nugetConfig({ nuget: { unread: [] } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [] } } })) && throws(() => nugetConfig({ nuget: { unread: { "a.props": [" "] } } })) && nugetConfig({ nuget: { unread: { "a.props": ["imports x"] } } }).unread["a.props"].length === 1,
     "the config's \"nuget.unread\" is a map from a file to the lines of the forms declared there");
 }
@@ -814,71 +809,11 @@ fs.rmSync(path.join(repo, "src/Wide"), { recursive: true }); git("add", "-A"); g
   fails = formCheck().failures;
   ok(fails.length === 1 && fails[0].startsWith("global.json holds") && fails[0].includes('sdk.paths: [".dotnet","$host$"]'), "a global.json's folder of SDKs that the pull request adds fails, its SDK's version passing", JSON.stringify(fails));
   inRepo("global.json", `{ "msbuild-sdks": { "My.Sdk": "1.0.0" } }`);
-  // (a program, by its first bytes, whatever its name: one the pull request adds fails, the first look lists it, the
-  // same bytes the base held pass, and other bytes at that path fail)
-  const DLL = "tools/Task.dll", dll = (n) => Buffer.concat([Buffer.from("MZ\x90\x00", "latin1"), Buffer.alloc(60, n)]);
-  inRepo(DLL, dll(1)); inRepo("tools/readme.bin", dll(2));
-  const programCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, "tools/readme.bin"], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
-  fails = programCheck();
-  const listed = run("--imports").stdout;
-  ok(fails.length === 2 && fails.every(f => /^tools\/(Task\.dll|readme\.bin) is a program, its bytes' sha256 [0-9a-f]{64}, which a restore may be made to load/.test(f) && f.includes("Mend: ")), "a program the pull request adds fails, whatever its name", JSON.stringify(fails));
-  git("add", "-A"); git("commit", "-q", "-m", "programs");
-  ok(run("--imports").stdout.split("\n").includes(DLL) && programCheck().length === 0, "the first look lists each program, and one the base held as it stands passes", listed);
-  inRepo(DLL, dll(3));
-  fails = programCheck();
-  ok(fails.length === 1 && fails[0].startsWith(`${DLL} is a program`), "and other bytes at its path fail", JSON.stringify(fails));
-  // (a program past the bound the check reads files to: by its bytes' hash all the same, hashed as it is read; and a
-  // file that runs though no first bytes call it a program, a script that starts "#!" or one git records as 100755)
-  const BIG = "tools/Big.dll", SCRIPT = "tools/run.sh", RUNS = "tools/runs", big = (n) => Buffer.concat([dll(n), Buffer.alloc((1 << 24) + 1, n)]);
-  inRepo(DLL, dll(1)); inRepo(BIG, big(4)); inRepo(SCRIPT, "#!/bin/sh\necho one\n"); inRepo(RUNS, "echo one\n"); fs.chmodSync(path.join(repo, RUNS), 0o755); git("add", RUNS);
-  const runsCheck = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, BIG, SCRIPT, RUNS], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
-  fails = runsCheck();
-  ok(fails.length === 3 && [BIG, SCRIPT, RUNS].every(f => fails.some(x => new RegExp(`^${f.replace(".", "\\.")} is a program, its bytes' sha256 [0-9a-f]{64}, which a restore may be made to load or start`).test(x))),
-    "a program past the bound the check reads to, a script that starts \"#!\" and a file git records as one that runs each fail where the pull request adds it", JSON.stringify(fails));
-  git("add", "-A"); git("commit", "-q", "-m", "programs that run");
-  const runsListed = run("--imports").stdout.split("\n");
-  ok(runsCheck().length === 0 && [BIG, SCRIPT, RUNS].every(f => runsListed.includes(f)), "the first look lists each, and each as the base held it passes", JSON.stringify(runsCheck()));
-  inRepo(BIG, big(5)); inRepo(SCRIPT, "#!/bin/sh\necho two\n"); inRepo(RUNS, "echo two\n");
-  fails = runsCheck();
-  ok(fails.length === 3, "and other bytes at each path fail, the large program's too", JSON.stringify(fails));
-  ok(fails.find(x => x.startsWith(RUNS))?.includes(`or drop its exec bit (git update-index --chmod=-x -- ${RUNS})`) && fails.find(x => x.startsWith(RUNS)).includes("the file's bytes at their hash") && !fails.find(x => x.startsWith(SCRIPT))?.includes("exec bit"),
-    "a file that is a program by git's mode alone names dropping that mode as a mend, and one whose first bytes say so does not", JSON.stringify(fails));
-  inRepo(BIG, big(4)); inRepo(SCRIPT, "#!/bin/sh\necho one\n"); inRepo(RUNS, "echo one\n"); inRepo("tools/plain", "echo one\n"); git("add", "-A"); git("commit", "-q", "-m", "a plain file");
-  fs.chmodSync(path.join(repo, "tools/plain"), 0o755); git("add", "tools/plain");
-  fails = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, BIG, SCRIPT, RUNS, "tools/plain"], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
-  ok(fails.length === 1 && fails[0].startsWith("tools/plain is a program"), "a file the base held as one that does not run, which the pull request makes one that does, fails though its bytes are the same", JSON.stringify(fails));
-  git("update-index", "--chmod=-x", "tools/plain");
-  // (a program that cannot be hashed, here one git records as one that runs and the checkout lacks, fails with its mend)
-  fs.rmSync(path.join(repo, RUNS));
-  try { fails = runsCheck(); } catch (e) { fails = [`threw: ${e.message}`]; }
-  ok(fails.length === 1 && fails[0].startsWith(`${RUNS} is a program (by its first bytes or git's mode) that leads to no file of bytes of the project's own, or that this check could not read to hash it`) && fails[0].includes("drop its exec bit"), "a program the check cannot hash fails, saying its mend", JSON.stringify(fails));
-  inRepo(RUNS, "echo one\n"); fs.chmodSync(path.join(repo, RUNS), 0o755);
-  // (where the project has no .NET project file, no restore runs: no form is read, and the first look lists no program)
-  inRepo(DLL, dll(9)); git("rm", "-q", "--cached", "src/App/App.csproj");
-  const noProject = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [L, DLL, BIG, SCRIPT, RUNS], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
-  const noneListed = run("--imports").stdout.split("\n");
-  git("add", "src/App/App.csproj"); inRepo(DLL, dll(1));
-  ok(noProject.length === 0 && ![DLL, BIG, SCRIPT, RUNS].some(f => noneListed.includes(f)), "with no .NET project file, a program changed fails nothing, and the first look lists none", JSON.stringify([noProject, noneListed]));
-  if (process.platform !== "win32") {
-    // (a link the base held to a program is held only where what it leads to stands as the base held it)
-    const LINK = "tools/Link.dll", withLink = () => check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, DLL, LINK], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
-    fs.symlinkSync("Task.dll", path.join(repo, LINK)); git("add", LINK); git("commit", "-q", "-m", "a link to a program");
-    const linkHeld = withLink();
-    inRepo(DLL, dll(6));
-    fails = withLink();
-    ok(linkHeld.length === 0 && fails.length === 2 && [DLL, LINK].every(f => fails.some(x => x.startsWith(`${f} is a program`))), "a link the base held to a program passes as it stands, and fails, beside the program, where what it leads to has other bytes", JSON.stringify([linkHeld, fails]));
-    inRepo(DLL, dll(1)); fs.rmSync(path.join(repo, LINK)); git("add", "-A"); git("commit", "-q", "-m", "no link");
-    // (a path the base held as a program that the pull request makes a link out of the project fails, and the first
-    // look lists it)
-    const away = scratchDir("nuget-test-away-");
-    fs.writeFileSync(path.join(away, "run"), "#!/bin/sh\n"); fs.rmSync(path.join(repo, RUNS)); fs.symlinkSync(path.join(away, "run"), path.join(repo, RUNS)); git("add", RUNS);
-    fails = runsCheck();
-    const awayListed = run("--imports").stdout.split("\n");
-    ok(fails.length === 1 && fails[0].startsWith(`${RUNS} was a program at the base and now leads to no file of bytes of the project's own`) && fails[0].includes("Mend: ") && awayListed.includes(RUNS),
-      "a path the base held as a program that now leads out of the project fails, saying its mend, and the first look lists it", JSON.stringify([fails, awayListed]));
-    fs.rmSync(path.join(repo, RUNS)); inRepo(RUNS, "echo one\n"); fs.chmodSync(path.join(repo, RUNS), 0o755); git("add", RUNS);
-  }
-  fs.rmSync(path.join(repo, "tools"), { recursive: true }); git("add", "-A"); git("commit", "-q", "-m", "no programs");
+  // (where the project has no .NET project file, no restore runs: no form is read)
+  inRepo(DBP, `<Project><Target Name="New" /></Project>`); git("rm", "-q", "--cached", "src/App/App.csproj");
+  const noProject = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [L, DBP], process.env, { base: "HEAD", baseConfig: null, fetched: true }).failures.filter(f => !f.startsWith(L));
+  git("add", "src/App/App.csproj");
+  ok(noProject.length === 0, "with no .NET project file, a form the pull request adds fails nothing", JSON.stringify(noProject));
   inRepo(DBP, `<Project><!DOCTYPE p><X /></Project>`);
   inRepo("build/Typed.props", `<!DOCTYPE p [<!ENTITY e "x">]><Project />`);
   r = check({ ships: [], nuget: { tools: [L] } }, repo, restore(), [...tracked, "build/Typed.props"], process.env, { base: "HEAD", baseConfig: null, fetched: true });

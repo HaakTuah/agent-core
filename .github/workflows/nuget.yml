@@ -16,13 +16,15 @@
 # fail and passes, a restore that fails included: for a project where the check itself is at fault, while that is
 # reported to the core and mended, and never to let a package through. A restore runs the pull request's own project
 # files, as its build would, and what they run could change anything in this job after it, the script and the manifests
-# it reads included: so before the restore a step fetches every package the lock files name, and every tool a manifest
+# it reads included: so no restore runs, the first look's own neither, unless the run proves the code the repository's
+# own (a pull request whose event names this repository as its head's; a pull request from another repository that
+# changes what NuGet reads fails, saying its mend, and one that changes nothing it reads passes); and before the restore a step fetches every package the lock files name, and every tool a manifest
 # of dotnet's names (dotnet-tools.json, in .config/ or any folder), holds each package to its lock file's content hash
 # and reads each licence from its own file (core/scripts/nuget-fetch.mjs, then nuget.mjs with --fetched; core archive
 # 201), and the project's files as committed, failing a form in one that it does not read (a target, a task, a
 # download or an SDK from a package, a setting that turns how the restore runs or where a build imports from, an Import
-# it cannot follow, a global.json's setting beyond the SDK's version, a program, by its first bytes or as git records
-# it, or a path that was one and leads to no file now), where the project has a .NET project file, unless the base held it or the config declares it: a verdict no build the pull request changed has run
+# it cannot follow, a global.json's setting beyond the SDK's version), where the project has a .NET project file,
+# unless the base held it or the config declares it: a verdict no build the pull request changed has run
 # beside (the first look below runs a build only where nothing it reads changed from the base, and so runs the base's
 # build files, which may run what else the pull request changed, gaining nothing the read judges); after the restore
 # the script reads nothing of git's for the base (nuget.mjs with --restored), since the restore could have rewritten

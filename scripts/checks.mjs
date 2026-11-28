@@ -7,7 +7,8 @@
 //   own script says; the header of .github/workflows/copies.yml says them together);
 // - description: the description check (pr-description.mjs), given the pull request's description in PR_BODY or a file;
 // - signatures and nuget, the package checks: first a look at whether the change touches what it reads, then npm's
-//   install and signature check, or NuGet's restore, each with its licence read. Before any part, each NuGet call's
+//   install and signature check, or NuGet's restore, each with its licence read, the restore only where the code is
+//   proven the repository's own (ownCode). Before any part, each NuGet call's
 //   lookup of the packages new to the project (lookup.mjs), since a restore runs the change's own build files. They go last, and the job runs each in
 //   a step of its own after the others; the NuGet restore runs the change's own build files, so it goes after all, and
 //   nothing that runs after it reads what a build could have changed.
@@ -28,7 +29,11 @@
 //
 //   node core/scripts/checks.mjs [copies] [description] [signatures | nuget] [--base <commit, or origin/<branch>>]
 //        [--copies <config>] [--sizes <marks>] [--description <file>] [--parts <headings, |-separated>]
-//        [--signatures <folder of package-lock.json>] [--nuget <licence config>] [--advisory]
+//        [--signatures <folder of package-lock.json>] [--nuget <licence config>] [--advisory] [--own-repository]
+//
+// --own-repository, outside a workflow alone, says the code checked out is the repository's own (a clone of the
+// owner's own project, as the daily try and a release's trial make): without it, there, the NuGet check runs no
+// restore (ownCode, below).
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -43,7 +48,7 @@ import { parseYaml } from "./parse-yaml.mjs";
 
 export const PARTS = ["copies", "description", "signatures", "nuget"];
 const OPTIONS = ["--base", "--copies", "--sizes", "--description", "--parts", "--signatures", "--nuget"];
-const FLAGS = ["--advisory"];
+const FLAGS = ["--advisory", "--own-repository"];
 // The checks of the part "copies", in the order its workflow ran them: each its step's name, its script, its argument
 // (an option's name) and the variable that gives it the base.
 export const COPIES = [
@@ -102,11 +107,11 @@ function copyAt(root) {
 
 // The parts and options given, each checked.
 export function options(args) {
-  const o = { parts: [], advisory: false };
+  const o = { parts: [], advisory: false, ownRepository: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (PARTS.includes(a)) { if (!o.parts.includes(a)) o.parts.push(a); continue; }
-    if (FLAGS.includes(a)) { o.advisory = true; continue; }
+    if (FLAGS.includes(a)) { o[a === "--advisory" ? "advisory" : "ownRepository"] = true; continue; }
     if (!OPTIONS.includes(a)) fail(`${a} is no part or option of this script.`, `name a part (${PARTS.join(", ")}) or an option the usage line at the top of scripts/checks.mjs shows.`);
     if (i + 1 >= args.length) fail(`${a} is given no value.`, "give it one, as the usage line at the top of scripts/checks.mjs shows.");
     o[a === "--parts" ? "headings" : a.slice(2)] = args[++i];
@@ -293,13 +298,16 @@ const RUN = {
     const dotnet = { DOTNET_CLI_TELEMETRY_OPTOUT: "1", DOTNET_NOLOGO: "1", EnableWindowsTargeting: "true" };
     const output = path.join(temp, "look");
     fs.writeFileSync(output, "");
-    const advisory = o.advisory ? ["--advisory"] : [], verdict = advised(o);
+    const advisory = o.advisory ? ["--advisory"] : [], verdict = advised(o), own = ownCode(o);
+    // (the look runs a restore of its own only where the code is proven the repository's own: OWN)
     const looked = check("Does the pull request change what NuGet reads?", () => run("bash", ["-e", `${coreAt}scripts/nuget-look.sh`], { env: {
       BASE: process.env.BASE_SHA || baseCommit(o.base), CONFIG: o.nuget, CALLER: process.env.CALLER ?? "", CORE_AT: coreAt,
-      NUGET_PACKAGES: path.join(temp, "nuget-look"), GITHUB_OUTPUT: output, ...dotnet } }));
+      NUGET_PACKAGES: path.join(temp, "nuget-look"), GITHUB_OUTPUT: output, OWN: own ? "true" : "", ...dotnet } }));
     if (!looked) return;
     const said = Object.fromEntries(fs.readFileSync(output, "utf8").split(/\r?\n/).filter(l => l.includes("=")).map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
     if (said.run === "false") return;
+    // (a restore runs the pull request's own build files: none runs unless the code is proven the repository's own)
+    if (!own) { check("Is the code the repository's own, so a restore may run its build files?", () => { console.log(`FAIL ${NOT_OWN}`); return false; }); return; }
     // (before the restore, which runs the pull request's own build files: each package's file held to its lock file's
     // content hash, and its licence read from it, and the project's files read as committed, whatever the look ran: it
     // ran a build only where nothing it reads changed from the base, so the base's build files, which gain nothing the
@@ -343,6 +351,21 @@ const RUN = {
     });
   },
 };
+
+// Whether the code checked out is proven the repository's own, so that a restore may run its build files: in a workflow
+// (GITHUB_ACTIONS), only where the event is a pull request whose event file names its head repository as this one
+// (a missing head repository, a fork's that was deleted, counting as another's; any other event proves nothing);
+// elsewhere only with --own-repository, which the daily try and a release's trial give for the clones they make of the
+// owner's own projects (check.mjs, which writes the event file its steps read). A session's own environment, which
+// could say anything here, is a foothold this does not hold against.
+export function ownCode(o, env = process.env) {
+  if (env.GITHUB_ACTIONS !== "true") return o.ownRepository === true;
+  if (env.GITHUB_EVENT_NAME !== "pull_request" || !env.GITHUB_EVENT_PATH || !env.GITHUB_REPOSITORY) return false;
+  let head;
+  try { head = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, "utf8"))?.pull_request?.head?.repo?.full_name; } catch { return false; }
+  return typeof head === "string" && head === env.GITHUB_REPOSITORY;
+}
+export const NOT_OWN = `this pull request comes from another repository, or nothing proves the code checked out is this repository's own, and it changes what NuGet reads; a restore runs its build files, so none ran. ${MEND}the owner brings the change into a branch of the repository, whose pull request runs the check whole (by hand, on a clone of the owner's own project, give --own-repository).`;
 
 // Each project file restored from its lock file alone into a folder of its own and read at once (readAfter, with
 // --restored and its lock file), before the next project's restore; the folder, with NuGet's caches of downloads and

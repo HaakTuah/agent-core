@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # The NuGet check's first look (core/scripts/checks.mjs, its part "nuget"; the header of .github/workflows/nuget.yml
 # says what it reads and why): whether the pull request changes anything NuGet reads, by git's own diff against the base
-# and, where none changed, by NuGet's own word from a restore against an empty source. It writes "run=false" to
-# $GITHUB_OUTPUT only where both say nothing changed. Run
+# and, where none changed, by NuGet's own word from a restore against an empty source, which runs the project's build
+# files, so only where OWN is "true" (checks.mjs proved the code the repository's own); without it git's diff alone
+# speaks. It writes "run=false" to $GITHUB_OUTPUT only where they say nothing changed. Run
 # by checks.mjs with bash -e, from the project's root, with BASE (the base's commit, empty with none), CONFIG (the
 # licence check's config), CALLER (the calling workflow's ref, empty with none), CORE_AT (the copy's folder, ending in
-# /), NUGET_PACKAGES (a folder of its own) and GITHUB_OUTPUT (the file it writes to). Git, bash, jq, the .NET SDK and
+# /), NUGET_PACKAGES (a folder of its own), GITHUB_OUTPUT (the file it writes to) and OWN. Git, bash, jq, the .NET SDK and
 # Node.
 # The checkout is the pull request merged into its base, with both parents, so the diff from the base is what
 # it changes. Any doubt means the check runs.
@@ -105,6 +106,9 @@ if [ -n "$BASE" ] && extra=$(jq -r '[.audit, (.nuget.sources // [])[]] | .[] | s
       shown "$changed" | sed 's/^/- /' # behind a dash and broken as above, so that no file's name starts or holds a workflow command
     elif printf '%s\n' "$listed" | grep -q '^120000 '; then
       echo "A listed file is a link to another, whose changes this step would not see."
+    elif [ "$OWN" != true ]; then
+      run=false
+      echo "Nothing NuGet reads changed by git's diff, and the code is not proven the repository's own, so no restore ran here to ask NuGet: nothing to restore."
     elif holds; then
       run=false
       echo "Nothing NuGet reads changed, and every lock file still holds what its project asks for: nothing to restore."
