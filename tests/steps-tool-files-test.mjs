@@ -6,6 +6,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { toolFilesRead, toolFilesState } from "../scripts/step-checks-tool-files.mjs";
 import { STEPS, Unread, project } from "../scripts/steps.mjs";
 import { Unwritten, held, writeToolCopies } from "../scripts/step-writers.mjs";
@@ -191,6 +192,11 @@ const submoduleKit = kit("a-submodule-carried-project", { packages: "." }, { at:
   const added = said(() => { const p = project(d); return toolFilesRead(p, toolFilesState(p).config); });
   fs.rmSync(extra);
   ok(/core\/scripts\/extra\.mjs is not the core's/u.test(added), "nor one that holds a script the core does not", added);
+  // (the steps run from the copy itself run their own code, whatever it holds: the copy's own copy-runs.mjs lets it run)
+  fs.writeFileSync(extra, "export {};\n");
+  const own = (await import(pathToFileURL(path.join(d, "core/scripts/copy-runs.mjs")).href)).copyRefused(d, "core/");
+  fs.rmSync(extra);
+  ok(own === null && /is not the core's/u.test(added), "while the steps run from the copy itself run it, a script beside the core's there", `${own}`);
   ok(step.check(project(d)) === null, "and with the copy put back, the step reads it and has nothing to list", step.check(project(d)) ?? "");
 }
 
