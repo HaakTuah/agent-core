@@ -85,9 +85,8 @@ export function scratchDir(prefix) {
 
 /** A link at `<dir>/<at>` whose text, "far/../" and its own name, leads back to itself where it is read by its spelling,
  *  as node's own realpath (fs.realpathSync) reads it, which then never ends; the system reads it through "far" beside
- *  it, a link to a folder of a scratch folder of its own, as the file "away" beside that folder. For a test that a check
- *  never walks a path a project's files shape by that realpath. Null on Windows, which reads a `..` by its spelling;
- *  else the file it leads to. */
+ *  it, a link to a folder of a scratch folder of its own, as the file "away" beside that folder. Null on Windows, which
+ *  reads a `..` by its spelling; else the file it leads to. */
 export function foldedLoop(dir, at) {
   if (process.platform === "win32") return null;
   const away = scratchDir("folded-loop-"), name = path.basename(at), from = path.dirname(path.join(dir, at));
