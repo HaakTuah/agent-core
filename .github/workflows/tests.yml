@@ -179,8 +179,10 @@ jobs:
     # (15 minutes, but 22 for the one job that also runs the strength check on a pull request, the condition its steps
     # name below: its suites take about 10.5 minutes, Stryker's set-up about 30 seconds and the check its whole budget,
     # 240, so at 15 it stood within seconds of its limit and was cancelled with every step passed; 22 holds it on a
-    # runner half again as slow, as #232 and #387 gave the Windows jobs room; #1291)
-    timeout-minutes: ${{ matrix.os == 'ubuntu-latest' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && 22 || 15 }}
+    # runner half again as slow, as #232 and #387 gave the Windows jobs room; #1291; and 22 for the Windows part sync,
+    # which on the least Node ran past 15 on main with no case failing, its newest Node at about 14.5, before the proof
+    # of a sync's head gained its cases)
+    timeout-minutes: ${{ (matrix.os == 'ubuntu-latest' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' || matrix.os == 'windows-latest' && matrix.parts == 'sync') && 22 || 15 }}
     # (on Linux, but in the part network, each step runs with the network cut off, loopback still up, so a test that
     # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
     # out; a step that must reach it names its own shell, bash, and
