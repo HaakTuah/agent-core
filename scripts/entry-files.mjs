@@ -141,8 +141,9 @@ if (guard(import.meta.url)) {
   const here = file => { const text = !throughSubmodule(file) && asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
   const read = verdict(here, was);
   for (const f of unread) {
-    // (the links on its way are named only where they are why it is not read: a link no read follows, or one into a submodule)
-    const way = throughSubmodule(f) || !asTheBaseReads(f) ? wayHere(f).map(p => `\`${p}\``).join(", then ") : "";
+    // (the links on its way are named only where they are why it is not read: a link no read follows, one into a submodule,
+    // or one the system does not follow as the walk reads it, such as one whose text holds a backslash on Linux or macOS)
+    const way = throughSubmodule(f) || !asTheBaseReads(f) || leadsOut(".", f) ? wayHere(f).map(p => `\`${p}\``).join(", then ") : "";
     const said = `${f} stands here but is not read${way ? `, reached through the link ${way}` : ""}: it is no regular file of the project's own of at most 1 MB, outside any submodule, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no submodule and no such link on its way${way ? ` (here ${way})` : ""}`;
     (core || (was && (was(f) !== null || !place.held(f))) ? read.fails : read.notes).push(said);
   }

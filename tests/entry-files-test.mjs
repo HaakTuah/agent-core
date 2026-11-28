@@ -218,6 +218,16 @@ try {
   u = runs();
   ok(u.status === 0 && u.out.includes("note") && u.out.includes(".kiro/steering/core.md stands here but is not read") && u.out.includes(".kiro/steering, where an agent tool takes its instructions from, lies in a submodule"),
     "against a base that held a submodule on the way to an entry file, left so, the entry file and the tool's folder are noted and fail nothing", u.out);
+  fs.rmSync(path.join(un, ".agents"), { recursive: true }); fs.mkdirSync(path.join(un, ".kiro/rules"), { recursive: true });
+  fs.writeFileSync(path.join(un, ".kiro/rules/core.md"), AG); fs.symlinkSync(".kiro", path.join(un, ".agents"));
+  u = runs();
+  ok(u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `.agents`"), "a file reached through a link into a submodule names that link", u.out);
+  if (process.platform !== "win32") {
+    fs.rmSync(path.join(un, ".agents")); fs.mkdirSync(path.join(un, "a/b/rules"), { recursive: true });
+    fs.writeFileSync(path.join(un, "a/b/rules/core.md"), AG); fs.symlinkSync("a\\b", path.join(un, ".agents"));
+    u = runs();
+    ok(!u.out.includes(".agents/rules/core.md stands here but is not read") || u.out.includes("reached through the link `.agents`"), "a link whose text holds a backslash, which Linux and macOS do not follow as a folder's path, is named where the file behind it is not read", u.out);
+  }
 } finally { fs.rmSync(un, { recursive: true, force: true }); }
 
 // the starter kit's entry files pull in what its AGENTS.md names, each with its tool's part; and the core's own
