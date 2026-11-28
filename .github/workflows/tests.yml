@@ -150,7 +150,8 @@ jobs:
   # six in one job ran past its limit on pull requests (by main's run 45922171536 at c4db3ce, the least Node's: rest
   # 176, steps 243, fresh 36, writes 254, second 94 and third 77 seconds, 892 in all of 900; #1446). Each part is sized
   # by its steps' times on the slow runner, which takes half as long again as another, so that it ends within its mark
-  # there too, no mark raised, and well within the job's limit: on Windows, by a run of every part on both Nodes (run 45339915083, #1213),
+  # there too, no mark raised, and well within the job's limit (since outgrown on Windows, past the marks and near the
+  # limit, taken to #812 by #1577): on Windows, by a run of every part on both Nodes (run 45339915083, #1213),
   # the longer of the two, of 600 (projects) 481, of 300 (sync) 228 and (hostile) 164, of 600 (kit with fresh) 488, of
   # 450 (converge) 239, (steps) 352, (writes) 354, (core with faults) 95, (core with places and terms) 380, (licences)
   # 329, (scans) 329 and (tools with packages) 280, and the rest's three of 480, 325, 369 and 253 seconds (a part with a
@@ -176,11 +177,14 @@ jobs:
       contents: read
       checks: read
     runs-on: ${{ matrix.os }}
-    # (15 minutes, but 22 for the one job that also runs the strength check on a pull request, the condition its steps
-    # name below: its suites take about 10.5 minutes, Stryker's set-up about 30 seconds and the check its whole budget,
-    # 240, so at 15 it stood within seconds of its limit and was cancelled with every step passed; 22 holds it on a
-    # runner half again as slow, as #232 and #387 gave the Windows jobs room; #1291)
-    timeout-minutes: ${{ matrix.os == 'ubuntu-latest' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' && 22 || 15 }}
+    # (15 minutes, but 22 for two kinds of job. The Linux job that also runs the strength check on a pull request, the
+    # condition its steps name below: its suites take about 10.5 minutes, Stryker's set-up about 30 seconds and the check
+    # its whole budget, 240, so at 15 it stood within seconds of its limit and was cancelled with every step passed; 22
+    # holds it on a runner half again as slow, as #232 and #387 gave the Windows jobs room (#1291). And every Windows
+    # job, whose parts outgrew 15: on main's hourly run at 6ce2fd2 sync took 14.6 on the newest Node and was cancelled
+    # past 15 on the least, no case failing, as in 3 of the last 5 full runs, and by #1577's run on both Nodes sync took
+    # up to 17.7 and projects 13.5, so 22 holds the room until #812 makes them faster or splits them)
+    timeout-minutes: ${{ (matrix.os == 'ubuntu-latest' && matrix.node == '.node-version' && contains(matrix.parts, 'projects') && github.event_name == 'pull_request' || matrix.os == 'windows-latest') && 22 || 15 }}
     # (on Linux, but in the part network, each step runs with the network cut off, loopback still up, so a test that
     # reaches it fails there, saying its mend where its output shows the fetch refused, or stalls until its time runs
     # out; a step that must reach it names its own shell, bash, and
