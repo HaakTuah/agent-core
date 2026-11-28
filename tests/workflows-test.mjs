@@ -675,6 +675,11 @@ function nugetStepCases(run) {
   fs.rmSync(path.join(repo, "ext/lib/x.props"));
   r = step(repo, "core/");
   ok(r.status === 0 && r.stdout.includes("ran 0"), "an empty one stops nothing", r.stdout + r.stderr);
+  // (where git cannot read the checkout, its index broken, the check does not run either, and the step says its mend)
+  const index = fs.readFileSync(path.join(repo, ".git/index")); put(repo, ".git/index", "broken");
+  r = step(repo, "core/");
+  ok(r.status === 1 && !r.stdout.includes("ran") && /^FAIL the checkout still holds .*or git could not read it/mu.test(r.stdout) && r.stdout.includes("Mend: "), "and where git cannot read the checkout, the check does not run, and the step fails saying its mend", r.stdout + r.stderr);
+  fs.writeFileSync(path.join(repo, ".git/index"), index);
   // (the submodule that carries the core, which the job checked out: put back and cleaned too, its own empty submodule
   // folders checked as the project's are)
   const lib = path.join(dir, "lib"); fs.mkdirSync(lib); git(lib, "init", "-q"); put(lib, "core/scripts/checks.mjs", STUB); put(lib, "core/x.txt", "x\n"); git(lib, "add", "-A"); git(lib, "commit", "-q", "-m", "lib");

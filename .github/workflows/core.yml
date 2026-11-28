@@ -435,7 +435,7 @@ jobs:
           git reset -q --hard HEAD && git clean -ffdxq
           # (git failing to list or read a folder counts as something standing there: fails closed)
           bare() {
-            local e p f s
+            local e p f s l
             f=$(mktemp) && git -C "${1:-.}" ls-files -s -z > "$f" || return 1
             while IFS= read -r -d '' e; do
               [ "${e%% *}" = 160000 ] || continue; p=$1${e#*$'\t'}
@@ -443,7 +443,7 @@ jobs:
                 git -C "$p" reset -q --hard HEAD && git -C "$p" clean -ffdxq || return 1
                 s=$(git -C "$p" status --porcelain --ignored --untracked-files=all --ignore-submodules=all) || return 1
                 [ -z "$s" ] && bare "$p/" || return 1
-              elif [ -L "$p" ] || [ -n "$(ls -A -- "$p" 2> /dev/null)" ]; then return 1; fi
+              elif [ -L "$p" ] || { [ -e "$p" ] && { ! l=$(ls -A -- "$p" 2> /dev/null) || [ -n "$l" ]; }; }; then return 1; fi
             done < "$f"; rm -f "$f"
           }
           top=$(git status --porcelain --ignored --untracked-files=all --ignore-submodules=all) || top="git could not read the checkout"

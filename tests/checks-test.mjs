@@ -251,6 +251,7 @@ if (args.includes("--restored") && process.env.FAIL_READ && args.join(" ").inclu
     && !/^ran (nuget\.mjs \[checks|dotnet restore)/m.test(r.out) && mended(r.out);
   for (const [what, args, extra] of [["a pull request from another repository", [], inWorkflow({ head: "stranger/project" })], ["one whose head repository is missing", [], inWorkflow({ head: null })],
     ["a pull_request_target from another repository", [], inWorkflow({ name: "pull_request_target", head: "stranger/project" })],
+    ["a pull_request_target whose event names this repository as its head's", [], inWorkflow({ name: "pull_request_target" })],
     ["a workflow_run", [], inWorkflow({ name: "workflow_run" })], ["a push with no event file", [], { ...inWorkflow({ name: "push" }), GITHUB_EVENT_PATH: "" }],
     ["a pull request with no event file", [], { ...inWorkflow(), GITHUB_EVENT_PATH: path.join(tmp, "no-event.json") }],
     ["--own-repository in a workflow, for another repository's pull request", ["--own-repository"], inWorkflow({ head: "stranger/project" })], ["a run by hand without --own-repository", [], {}]]) {
