@@ -170,7 +170,7 @@ try {
     fs.symlinkSync("../../docsl/b.md", path.join(dir, ".kiro/steering/through.md"));
     const through = commit("a link to a folder, and one through a linked folder");
     r = check({ COPIES_BASE: through });
-    ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*through\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it at the base too", r.out);
+    ok(r.status === 0 && !/EISDIR/.test(r.out) && /not yet in the baseline: .*docs\/b\.md.*the pull request's base held it/.test(r.out), "a link to a folder in a tool's folder is passed over, and a file reached through a linked folder is read through it, as the file it leads to, at the base too", r.out);
     // (of the code and prose a config names, a tracked link that leads out of the project, to a device, to a folder or
     // nowhere, and a file past the bound, are unread and counted; a link inside the project is read once)
     const away0 = scratchDir("copies-tools-out-");
