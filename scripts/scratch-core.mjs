@@ -269,25 +269,35 @@ export function checkoutStandIn(env, tmp) {
   };
 }
 
-/** The stand-in for GitHub's API, for a test that runs a workflow calling gh
- *  (clean-merges-test.mjs, pure-sync-test.mjs): a `gh` first on the PATH that answers a GET from the JSON file
- *  `ghData` (a route's pattern to its answer; none found: gh's own "Not Found"), and logs each call with -X, its route
- *  and what it was sent, to `ghLog`; and the project's address, https://github.com/someone/project, rewritten to the
- *  repository `origin`. It gives `env`, the environment to run the workflow in, with the paths of the two files. */
+/** The stand-in for GitHub's API, for a test that runs a workflow or a script calling gh
+ *  (clean-merges-test.mjs, pure-sync-test.mjs, hostile-pr-changes-test.mjs, upgrade-test.mjs): a `gh` first on the
+ *  PATH that answers a GET from the JSON file `ghData` (a route's pattern to its answer; none found: gh's own "Not
+ *  Found"), and logs each call with -X, its route and what it was sent, to `ghLog`; and the project's address,
+ *  https://github.com/someone/project, rewritten to the repository `origin`. It gives `env`, the environment to run the
+ *  workflow in, with the paths of the two files. (On Windows, where Node starts no stub with no extension, a `gh.exe`
+ *  beside it, Node's own program by another name, which a file preloaded by NODE_OPTIONS makes the stand-in.) */
 export function ghStandIn(env, tmp, origin) {
   const stubs = path.join(tmp, "bin"), ghData = path.join(tmp, "gh-data.json"), ghLog = path.join(tmp, "gh-log");
   fs.mkdirSync(stubs);
-  fs.writeFileSync(path.join(stubs, "gh"), `#!/usr/bin/env node
-const fs = require("fs");
-const a = process.argv.slice(2), data = JSON.parse(fs.readFileSync(process.env.GH_DATA, "utf8"));
+  const answer = `const fs = require("fs");
+const data = JSON.parse(fs.readFileSync(process.env.GH_DATA, "utf8"));
 const route = a.find((x, i) => i > 0 && !x.startsWith("-") && !["-X", "--input", "--jq"].includes(a[i - 1]));
 if (a.includes("-X")) { fs.appendFileSync(process.env.GH_LOG, route + " " + fs.readFileSync(0, "utf8") + "\\n"); process.exit(0); }
 const found = Object.entries(data).find(([pattern]) => new RegExp(pattern).test(route));
 if (!found) { console.error("gh: Not Found (HTTP 404)"); process.exit(1); }
 console.log(JSON.stringify(a.includes("--slurp") ? [found[1]] : found[1]));
-`, { mode: 0o755 });
+process.exit(0);
+`;
+  fs.writeFileSync(path.join(stubs, "gh"), `#!/usr/bin/env node\nconst a = process.argv.slice(2);\n${answer}`, { mode: 0o755 });
+  let windows = {};
+  if (process.platform === "win32") {
+    const preload = path.join(stubs, "gh-stand-in.cjs");
+    fs.writeFileSync(preload, `if (require("path").basename(process.execPath).toLowerCase() === "gh.exe") {\nconst [, script, ...rest] = process.argv, a = [require("path").basename(script), ...rest];\n${answer}}\n`);
+    try { fs.linkSync(process.execPath, path.join(stubs, "gh.exe")); } catch { fs.copyFileSync(process.execPath, path.join(stubs, "gh.exe")); }
+    windows = { NODE_OPTIONS: `${env.NODE_OPTIONS ?? ""} --require "${preload.replace(/\\/g, "/")}"`.trim() };
+  }
   const PATHKEY = Object.keys(env).find(k => k.toUpperCase() === "PATH") ?? "PATH";
   const n = Number(env.GIT_CONFIG_COUNT);
-  return { ghData, ghLog, env: { ...env, [PATHKEY]: `${stubs}${path.delimiter}${env[PATHKEY]}`, GH_DATA: ghData, GH_LOG: ghLog,
+  return { ghData, ghLog, env: { ...env, ...windows, [PATHKEY]: `${stubs}${path.delimiter}${env[PATHKEY]}`, GH_DATA: ghData, GH_LOG: ghLog,
     GIT_CONFIG_COUNT: String(n + 1), [`GIT_CONFIG_KEY_${n}`]: `url.${slash(origin)}.insteadOf`, [`GIT_CONFIG_VALUE_${n}`]: "https://github.com/someone/project.git" } };
 }

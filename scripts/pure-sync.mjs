@@ -17,12 +17,14 @@
 // of the core (any other sync is reviewed like any PR, and merges after it); the copy is a folder, and the core's tree at
 // that pin, compared as copy-tree.mjs compares (and says why), without the folder the core keeps to itself; and every
 // call to a core workflow is pinned to a commit of the core's main.
-// It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
+// It first asks the host whether the head is that of a pull request opened from a branch of the project's own
+// repository, as a sync's always is (own-head.mjs), and proves nothing, reading nothing of the head, where that is not
+// shown. It prints the head it checked, for the merge call's `sha` (`tasks/github-calls.md`), so nothing pushed after the
 // check can merge.
 // With `--trial <full SHA>`, a release's trial asks it against that commit before it is a release (#1261): the pin must
 // be that commit, read as the release it is to be. A reading, no proof: it never exits 0 nor names a head to merge, and
-// ends with `trial answer: ` and JSON, for release-trial.mjs. The merge's gate gives no argument. Git and Node's own modules only, and gh where no workflow's event says whose account holds the
-// repository (releases.mjs, hostAccount); it changes nothing.
+// ends with `trial answer: ` and JSON, for release-trial.mjs. The merge's gate gives no argument. Git and Node's own modules only, and gh for the head's pull requests and where no workflow's event says whose
+// account holds the repository (releases.mjs, hostAccount); it changes nothing.
 import "./whole-output.mjs";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -37,7 +39,13 @@ import { BLOCKS, CORE_YML, whole } from "./core-owned.mjs";
 import { WORKFLOW } from "./power.mjs";
 import { fresh, kind } from "./fresh.mjs";
 import { privateOf } from "./host-private.mjs";
+import { headFrom } from "./own-head.mjs";
 import { project } from "./steps.mjs";
+import { lookOnlyOnPath } from "./workflow-run.mjs";
+
+// (git and gh, started here in a clone whose head may be another's, are looked for on the PATH alone, before
+// anything runs: workflow-run.mjs)
+lookOnlyOnPath();
 
 const CORE = `https://github.com/${ADDRESS}.git`;
 const [mode, asked, ...more] = process.argv.slice(2), tried = mode === "--trial" && !more.length && /^[0-9a-f]{40}$/u.test(asked ?? "") ? asked : null;
@@ -53,19 +61,19 @@ const CALL = new RegExp(`(?<![\\w./-])(${A}\\/\\.github\\/workflows\\/[\\w.-]+@)
 const fail = [];
 
 const head = git(["rev-parse", "HEAD"]);
+// (the merge's gate: a head from the repository itself first, before anything of it is read; own-head.mjs)
+const seen = tried ? null : headFrom(head, process.cwd());
+if (seen && !seen.own) { fail.push(seen.why); done("unknown"); }
 // (the project's main, fetched from its origin; a release's trial on a clone that has no origin reads the clone's own
 // main instead, its reading proving no merge, while the merge's gate, which waives the reviews, takes main from the
-// origin alone and, with none, gives its reading that it is not proved; #1361, point 15)
+// origin alone, and where the clone names none stopped above, the head not shown to be the project's; #1361, point 15)
 const hasOrigin = (() => { try { raw(["remote", "get-url", "origin"]); return true; } catch { return false; } })();
 let mainRef = "FETCH_HEAD", givenPrivate = false;
 if (hasOrigin) git(["fetch", "-q", "--no-tags", "origin", "refs/heads/main"]);
-else if (tried) mainRef = "refs/heads/main";
-else mainRef = null;
-const base = (() => { try { return mainRef && git(["merge-base", mainRef, head]); } catch { return null; } })();
+else mainRef = "refs/heads/main";
+const base = (() => { try { return git(["merge-base", mainRef, head]); } catch { return null; } })();
 if (!base) {
-  const why = mainRef === null
-    ? "the clone has no origin to fetch the project's main from, so the sync is not proved against it. Mend: run it in a clone of the project's repository whose origin is its address on the host, with the sync's branch checked out"
-    : `the project's main (${mainRef === "FETCH_HEAD" ? "fetched from the origin" : "the clone's own branch main, as the clone has no origin"}) shares no commit with the sync's branch, so the sync is not proved against it. Mend: run it in a clone that holds the project's main${mainRef === "FETCH_HEAD" ? "" : " as its branch main"}, with the sync's branch made from it checked out`;
+  const why = `the project's main (${mainRef === "FETCH_HEAD" ? "fetched from the origin" : "the clone's own branch main, as the clone has no origin"}) shares no commit with the sync's branch, so the sync is not proved against it. Mend: run it in a clone that holds the project's main${mainRef === "FETCH_HEAD" ? "" : " as its branch main"}, with the sync's branch made from it checked out`;
   fail.push(why);
   done("unknown");
 }
@@ -268,5 +276,5 @@ function done(from) {
     process.exit(1);
   }
   console.log(`a pure sync: core ${oldPin.slice(0, 7)} -> ${pin.slice(0, 7)}, ${files.length} files, ${pins.size} pins on the core's main`);
-  console.log(`merge it with sha=${head}`);
+  console.log(`merge it with sha=${head}, the head of an open pull request of ${seen.repo} from a branch of it`);
 }

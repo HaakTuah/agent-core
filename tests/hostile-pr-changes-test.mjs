@@ -25,7 +25,7 @@ import { library, regular, shown } from "../scripts/reading.mjs";
 import { rules } from "../scripts/rules.mjs";
 import { LIMITS, conditions, cuts, total, tree as readTree } from "../scripts/read-total.mjs";
 import { LARGEST } from "../scripts/tree-walk.mjs";
-import { scratchDir, scratchEnv, root, projectOf } from "../scripts/scratch-core.mjs";
+import { ghStandIn, scratchDir, scratchEnv, root, projectOf } from "../scripts/scratch-core.mjs";
 
 let failed = 0;
 const ok = (cond, what) => { console.log(`${cond ? "ok  " : "FAIL"} ${what}`); if (!cond) failed++; };
@@ -89,7 +89,15 @@ fs.writeFileSync(path.join(outside, "secret.txt"), "not the project's\n");
 // are tried)
 
 // ---- pure-sync.mjs: what a sync branch carries ----
-const pure = () => run("pure-sync.mjs");
+// (as a merger runs it: its origin the project's address on GitHub, rewritten to the bare repository, and gh a stand-in
+// that gives the head's pull request, opened from a branch of the project's own repository; own-head.mjs)
+const { env: hostEnv, ghData } = ghStandIn(env, tmp, origin);
+const pure = () => {
+  const ours = { full_name: "someone/project", id: 4000 + 2 }, head = git(p, "rev-parse", "HEAD");
+  fs.writeFileSync(ghData, JSON.stringify({ "pulls\\?state=open": [{ number: 1, head: { sha: head, repo: ours }, base: { repo: ours } }] }));
+  git(p, "remote", "set-url", "origin", "https://github.com/someone/project.git");
+  try { return run("pure-sync.mjs", [], hostEnv); } finally { git(p, "remote", "set-url", "origin", origin); }
+};
 const notPure = (r, why) => r.status === 1 && r.out.includes("not a pure sync") && (!why || r.out.includes(why)) && !raw(r.out);
 
 branch("big", () => write("core/big.txt", "x".repeat(8 << 20)));

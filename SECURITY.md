@@ -126,6 +126,12 @@ This repository takes the floor whole, `floor/security.md` and `floor/topics/`, 
      first page of its files and the comparison that gives them read whole, at GitHub's own size (its count of one
      file read first), 1 MB of the progress file, 240 characters of a line it adds, 90 s and a job of 3 minutes;
      hostile tests: `tests/hostile-github-test.mjs`, and for the last `tests/queue-only-test.mjs`.
+   - the repository's open pull requests, each one's number, its head's commit and its head's and base's repositories,
+     a fork's among them: read by the check that a head comes from a branch of the repository itself
+     (`scripts/own-head.mjs`, for `scripts/pure-sync.mjs` and `scripts/attached.mjs`), which compares the repositories
+     by the host's number for each alone, says a pull request's number only where it is a number and no name the answer
+     gives, and shows nothing where a field is missing or of another shape; limits: 64 MB of an answer, the pages none
+     of their own, the 64 MB bounding them all, 60 s; hostile tests: `tests/pure-sync-test.mjs`.
    - a project's configs of the core's checks, its manifest and its `SECURITY.md`: read by the copies, shape, size,
      licence and manifest checks (`scripts/copies.mjs`, `scripts/shape.mjs`, `scripts/size.mjs`,
      `scripts/reading-size.mjs`, `scripts/licences.mjs`, `scripts/manifest-reads.mjs`), the sync and its steps

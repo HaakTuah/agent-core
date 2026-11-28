@@ -49,7 +49,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE } from "../scripts/core-address.mjs";
 import { fill, oneJob, readyOnly } from "../scripts/init.mjs";
-import { hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
+import { ghStandIn, hostSays, scratchDir, scratchEnv } from "../scripts/scratch-core.mjs";
 import { where } from "../scripts/shape.mjs";
 import { STAGES } from "../scripts/steps-stage.mjs";
 import { ruleTexts, wordsKept } from "../scripts/steps-kit.mjs";
@@ -263,14 +263,20 @@ function project(name, from, { owner, kit, isPrivate, windows, files, as }) {
 
 // pure-sync.mjs from the commit under test, as the session that merges a sync runs it in the project's clone: its
 // origin by its address on GitHub, which git takes to the bare repository, and the host's answer, whether it is
-// private, from GitHub's event, since the proof honours no test's stand-in (scripts/host-private.mjs).
+// private, from GitHub's event, since the proof honours no test's stand-in (scripts/host-private.mjs); gh a stand-in
+// that gives the head's pull request, opened from a branch of the project's own repository (scripts/own-head.mjs), and
+// its address on GitHub taken nowhere by the stand-in's rewrite, which is left out, and on Windows its preload kept.
+let host = null;
 function provePure(p) {
+  host ??= ghStandIn(env, fs.mkdtempSync(path.join(tmp, "gh-")), path.join(tmp, "no-origin.git"));
+  const PATHKEY = Object.keys(host.env).find(k => k.toUpperCase() === "PATH"), ours = { full_name: p.repo, id: 4000 + 2 };
+  fs.writeFileSync(host.ghData, JSON.stringify({ "pulls\\?state=open": [{ number: 1, head: { sha: git(p.dir, "rev-parse", "HEAD"), repo: ours }, base: { repo: ours } }] }));
   const onGitHub = `https://github.com/${p.repo}.git`, origin = git(p.dir, "config", "--get", "remote.origin.url"), event = path.join(tmp, `${p.name}-event.json`);
   fs.writeFileSync(event, JSON.stringify({ repository: { full_name: p.repo, private: p.isPrivate } }));
   git(p.dir, "config", `url.${slash(origin)}.insteadOf`, onGitHub);
   git(p.dir, "remote", "set-url", "origin", onGitHub);
   try {
-    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p.dir, env: { ...env, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
+    const r = spawnSync(process.execPath, [path.join(theCore, "scripts", "pure-sync.mjs")], { cwd: p.dir, env: { ...env, [PATHKEY]: host.env[PATHKEY], ...(host.env.NODE_OPTIONS && { NODE_OPTIONS: host.env.NODE_OPTIONS }), GH_DATA: host.ghData, GH_LOG: host.ghLog, GITHUB_EVENT_PATH: event }, encoding: "utf8" });
     return { status: r.status, out: `${r.stdout}${r.stderr}` };
   } finally {
     git(p.dir, "remote", "set-url", "origin", origin);
@@ -1361,7 +1367,7 @@ function preRelease(name, { windows }) {
   const commitWhatItWrote = message => { git(dir, "add", "-A"); const wrote = git(dir, "status", "--porcelain") !== ""; if (wrote) git(dir, "commit", "-q", "-m", message); return wrote; };
   let s = node(dir, "core/scripts/sync.mjs");
   const wrote = commitWhatItWrote("Sync the core");
-  let pure = wrote ? node(dir, path.join(theCore, "scripts", "pure-sync.mjs")) : { status: null, out: "(no sync commit to read: the sync wrote nothing)" };
+  let pure = wrote ? provePure(p) : { status: null, out: "(no sync commit to read: the sync wrote nothing)" };
   ok(wrote && s.status === 0 && fs.readFileSync(path.join(dir, "core-manifest.md"), "utf8").includes(git(theCore, "rev-parse", "HEAD")) && pure.status === 1 && /is no release of the core/.test(pure.out),
     `${name}: its own old sync script, with no SHA, takes the core's main, a commit no release holds, and pure-sync.mjs refuses it`, `${s.out}\n${pure.out}`);
 

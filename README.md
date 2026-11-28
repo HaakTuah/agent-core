@@ -98,8 +98,8 @@ the project, the yeses it asks, the stop switch, what it costs and the settings 
    that needs the parser installs it itself in a copy, as above; in the core it says so, with its mend. Its
    devDependencies, which only the core's own tests run, a copy never installs. A change reaches a project only through a sync PR there, made by `core/scripts/sync.mjs`, which, once the copy
    is written, writes what the core owns by the one process a new project's starter kit uses too (`scripts/converge.mjs`;
-   `core-changes/projects.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, as
-   `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
+   `core-changes/projects.md`, "One process takes the core in"). A pure sync (only the copy, its pins and what that process writes or takes out, its head on a branch of the
+   project's own repository, as `scripts/pure-sync.mjs` proves, run from a checkout of this repository's `main` and never from
    the PR's own copy) gets no review of its own, since the core's PR reviewed what it carries (floor rule 8), and is
    merged by hand at the head that script names, never by auto-merge; one that also fixes the project's pointers into
    core files the sync moved or removed is reviewed like any PR. Where a change to the core asks something of the
