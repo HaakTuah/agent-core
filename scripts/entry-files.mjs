@@ -7,7 +7,8 @@
 // It fails an entry file that pulls in less than AGENTS.md names, saying the line to add, and one its tool would not
 // load at every session's start by its front matter (Kiro's `inclusion`, `always` where it is left out; Antigravity's
 // `trigger: always_on`). A line inside a fenced block or an HTML comment pulls in nothing. A tool that reads AGENTS.md
-// alone (Codex) has no entry file, and an entry file the project does not hold is not looked for.
+// alone (Codex) has no entry file, and an entry file the project does not hold is not looked for. It fails too a tool's
+// folder of instructions, or a tool's file, that a submodule holds (rule-files.mjs, inSubmodule), where no check reads.
 //
 // Nothing locks a project (core-changes/projects.md of the core): with ENTRY_BASE set to the pull request's base (as
 // the copies workflow sets it), what the base already lacked is noted and fails nothing, so only what the pull request
@@ -21,7 +22,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { ownText } from "./core-path.mjs";
-import { ENTRY_FILES, followLinks, isFolderHere, isLinkHere, linkTextHere, placeAt, readAt } from "./rule-files.mjs";
+import { ENTRY_FILES, FOLDERS, TOOL_FILES, followLinks, inSubmodule as heldBySubmodule, isFolderHere, isLinkHere, linkTextHere, placeAt, readAt } from "./rule-files.mjs";
 import { asText, leadsOut } from "./guards.mjs";
 import { guard } from "./mend.mjs";
 
@@ -76,6 +77,9 @@ const throughSubmodule = file => {
   const at = followLinks(clean(file), p => { passed ||= inSubmodule(p); return isLinkHere(p); }, linkTextHere, isFolderHere);
   return passed || (at !== null && inSubmodule(at));
 };
+// (each agent tool's folder of instructions, and each of its files that is no entry file, that a submodule here holds,
+// as rule-files.mjs's inSubmodule reads it: the checks list none of what a tool reads there)
+const toolsInSubmodule = () => { inSubmodule(""); return [...FOLDERS, ...TOOL_FILES.filter(f => !ENTRY.some(e => e.file === f))].filter(f => heldBySubmodule(f, isLinkHere, linkTextHere, isFolderHere, gitlinks)); };
 // Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit (followLinks): written
 // relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link
 // alike where a `..` is read as Linux and macOS read it (followLinks says what holds on Windows).
@@ -131,6 +135,12 @@ if (guard(import.meta.url)) {
   for (const f of unread) {
     const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, outside any submodule, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no submodule and no such link on its way`;
     (core || (was && (was(f) !== null || !place.held(f))) ? read.fails : read.notes).push(said);
+  }
+  // (a tool's folder or file a submodule holds fails, where the base's submodules held none of it, as the pull request's
+  // own doing, and is noted where they did)
+  for (const f of toolsInSubmodule()) {
+    const said = `${f}, where an agent tool takes its instructions from, lies in a submodule, or holds one, here or through a link, so no check can read what the tool reads there. Mend: keep the tool's files in the project's own tree, with no submodule at ${f}, inside it or on its way`;
+    (core || (place && !place.submodule(f)) ? read.fails : read.notes).push(said);
   }
   // (in a project with no base to read against, nothing is new: each is a note)
   const { fails, notes } = core || base ? read : { fails: [], notes: [...read.notes, ...read.fails] };

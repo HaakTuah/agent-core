@@ -45,7 +45,7 @@ import { checkRules } from "./links.mjs";
 import { markdownReader } from "./markdown.mjs";
 import { DEEPEST, LIST, SEARCHED, brokenNames, listOf, nameKey } from "./names.mjs";
 import { didNotRun, installed } from "./packages.mjs";
-import { readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
+import { placeAt, readAt, ruleFiles, toolFiles } from "./rule-files.mjs";
 import { guard } from "./mend.mjs";
 
 guard(import.meta.url); // (an error it does not catch fails with its mend: mend.mjs)
@@ -68,13 +68,14 @@ const readMarkdown = await markdownReader();
 // the broken pointers in its agent tools' files, each by its file and its words, as one JSON list; #405)
 const AT = process.argv.includes("--tools-at") ? process.argv[process.argv.indexOf("--tools-at") + 1] : null;
 if (AT !== null && !/^[0-9a-f]{40}$/u.test(AT ?? "")) { console.error("FAIL: --tools-at takes a commit's full SHA, which this script gives itself. Mend: run it without --tools-at"); process.exit(1); }
-// (at a commit, a link inside its tree followed as the work tree follows it: rule-files.mjs, `readAt`)
-const atCommit = AT ? readAt(AT) : null;
+// (at a commit, a link inside its tree followed as the work tree follows it: rule-files.mjs, `readAt`; its text read to
+// the same bound as the work tree's, a larger file as empty there too)
+const BOUND = 1 << 20, place = AT ? placeAt(AT) : null, atCommit = AT ? readAt(AT, place) : null, atBounded = AT ? readAt(AT, place, { bound: BOUND }) : null;
 // (in the work tree, a file is read as ownText reads it: a regular file of the project's own, of at most the mebibyte
 // SECURITY.md gives an agent tool's files, a link inside the project followed; anything else reads as empty, and a rule
 // file so is failed below)
-const BOUND = 1 << 20, own = f => ownText(f, { bound: BOUND });
-const text = f => (AT ? atCommit(f) ?? "" : own(f) ?? "");
+const own = f => ownText(f, { bound: BOUND });
+const text = f => (AT ? atBounded(f) ?? "" : own(f) ?? "");
 // (a submodule's files too, at their paths from here: a library that carries the core brings its copy so; core-path.mjs)
 let tracked;
 try { tracked = (AT ? git(['ls-tree', '-r', '-z', '--name-only', AT]) : git(['ls-files', '-z', '--recurse-submodules'])).split('\0').filter(Boolean); }
@@ -86,8 +87,9 @@ function baseCommit() {
   if (!from) return null;
   try { return git(["rev-parse", "--verify", "--quiet", "--end-of-options", `${from}^{commit}`]).trim(); } catch { console.error(`FAIL: ${logged(`POINTERS_BASE ${from} is not a commit here`)}. Mend: fetch it (git fetch origin <the base branch>) before the check runs`); process.exit(1); }
 }
-// (at a commit, the reader carries where a path leads, as the work tree's does, so that both list a tool's file that is a link alike)
-const show = AT ? Object.assign(f => (tracked.includes(f) ? atCommit(f) : null), { where: atCommit.where }) : undefined, under = AT ? dir => tracked.filter(f => dir === "." || f.startsWith(`${dir}/`)) : undefined;
+// (at a commit, the reader carries where a path leads and the links on its way, as the work tree's does, so that both
+// list a tool's file that is a link, and each link of a chain, alike)
+const show = AT ? Object.assign(f => (tracked.includes(f) ? atCommit(f) : null), { where: atCommit.where, links: atCommit.links }) : undefined, under = AT ? dir => tracked.filter(f => dir === "." || f.startsWith(`${dir}/`)) : undefined;
 let RULES, TOOLS;
 try {
   // (an agent tool's files that no other way names a rule file, tracked, as git lists them)
