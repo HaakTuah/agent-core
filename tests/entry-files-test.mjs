@@ -58,6 +58,11 @@ const base = reader({ "AGENTS.md": AGENTS, ".kiro/steering/core.md": "#[[file:co
 let v = verdict(head, base);
 ok(v.fails.length === 1 && v.fails[0].includes("core/roles/shared/git.md") && v.notes.length === 1 && v.notes[0].includes("core/floor/security.md"),
   "against a base, only what the pull request leaves out fails; what the base already lacked is noted (nothing locks a project)");
+const reads = new Map(), counted = Object.assign(f => { reads.set(f, (reads.get(f) ?? 0) + 1); return base(f); }, { held: () => true });
+const many = Array.from({ length: 50 }, (_, i) => `@core/roles/shared/x${i}.md\n`).join("");
+v = verdict(reader({ "AGENTS.md": `${AGENTS}${many}`, ".kiro/steering/core.md": "#[[file:core-manifest.md]]\n" }), counted);
+ok(v.fails.length === 50 && v.fails[49].includes("x49.md") && Math.max(...reads.values()) <= 2,
+  "against a base it held, each file there is read at most twice however many imports the head lacks, since each read is a call to git", JSON.stringify([...reads]));
 v = verdict(head);
 ok(v.fails.length === 2 && v.notes.length === 0, "with no base, as in the core's own repository, everything fails");
 ok(v.fails.every(f => f.includes("Mend: add the line #[[file:")), "each failure names the line to add, in the tool's own form");
@@ -152,7 +157,7 @@ try {
     ]) {
       made(); commit(what);
       r = run({ ENTRY_BASE: "HEAD" });
-      ok(r.status === 0 && (spelt && bySpelling ? !r.out.includes("stands here but is not read") : r.out.includes("note") && r.out.includes("stands here but is not read")), `against a base where ${what}, left so, it is noted and fails nothing${spelt ? " (where the system reads its `..` by its spelling, it reaches what stands and fails nothing)" : ""}`);
+      ok(r.status === 0 && (spelt && bySpelling ? !r.out.includes("note") && !r.out.includes("stands here but is not read") : r.out.includes("note") && r.out.includes("stands here but is not read")), `against a base where ${what}, left so, it is noted and fails nothing${spelt ? " (where the system reads its `..` by its spelling, it reaches what stands, and nothing is noted or fails)" : ""}`);
       fs.rmSync(path.join(dir, "x"), { force: true }); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); swap(".agents", () => write(".agents/rules/core.md", AG)); commit(`${what}, undone`);
     }
     // (a link through a folder link, then back up from the folder it reached, to a file there: read as the system reads it)
@@ -161,7 +166,7 @@ try {
     // read, and the check rightly fails, saying so)
     const readsThere = (() => { try { return fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8") === "@AGENTS.md\n"; } catch { return false; } })();
     r = run({ ENTRY_BASE: "HEAD" });
-    ok(readsThere ? r.status === 0 && !r.out.includes("stands here but is not read") : r.status === 1 && r.out.includes("stands here but is not read"), "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes where the system reads it so, and fails, saying so, where it reads the `..` by its spelling");
+    ok(readsThere ? r.status === 0 && !r.out.includes("note") && !r.out.includes("stands here but is not read") : r.status === 1 && r.out.includes("stands here but is not read"), "against a base that held an entry file as a link through a folder link and back up from the folder it reached, left so, it is read and passes where the system reads it so, and fails, saying so, where it reads the `..` by its spelling");
     fs.rmSync(path.join(dir, "x")); swap("CLAUDE.md", f => fs.writeFileSync(f, "@AGENTS.md\n")); commit("CLAUDE.md through a folder link and up, undone");
     const awayDir = `${away}.d`;
     fs.mkdirSync(path.join(awayDir, "rules"), { recursive: true }); fs.writeFileSync(path.join(awayDir, "rules/core.md"), AG);
@@ -177,6 +182,63 @@ try {
     ok(r.status === 0 && r.out.includes("note") && r.out.includes(".kiro/steering/core.md stands here but is not read"), "against a base that held the same folder as a link leading nowhere, it is noted and fails nothing");
   } finally { fs.rmSync(away, { force: true }); fs.rmSync(`${away}.d`, { recursive: true, force: true }); }
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+// (a base that held a file it did not read, past the bound or behind a submodule, and an AGENTS.md read in neither)
+const un = scratchDir("entry-files-unread-");
+try {
+  const g = (...a) => execFileSync("git", a, { cwd: un, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const put = (f, t) => { fs.rmSync(path.join(un, f), { recursive: true, force: true }); fs.mkdirSync(path.dirname(path.join(un, f)), { recursive: true }); fs.writeFileSync(path.join(un, f), t); };
+  const commit = what => { g("add", "-A"); g("commit", "-qm", what); };
+  const runs = () => { try { return { status: 0, out: execFileSync(process.execPath, [SCRIPT], { cwd: un, encoding: "utf8", env: { ...process.env, ENTRY_BASE: "HEAD" }, stdio: ["ignore", "pipe", "pipe"] }) }; } catch (e) { return { status: e.status, out: `${e.stdout}${e.stderr}` }; } };
+  const big = `${"x".repeat(1 << 20)}\n`, lacks = "pulls in none of `core/floor/security.md`";
+  g("init", "-q"); g("config", "user.email", "x@example.invalid"); g("config", "user.name", "x"); g("config", "commit.gpgsign", "false");
+  put("AGENTS.md", AGENTS); put("CLAUDE.md", `@core-manifest.md\n${big}`); commit("an entry file past the bound");
+  put("CLAUDE.md", "@core-manifest.md\n");
+  let u = runs();
+  ok(u.status === 0 && u.out.includes(`note (it stood so before this pull request, so it fails nothing): CLAUDE.md (Claude Code's entry file) ${lacks}`),
+    "against a base that held an entry file past the bound, a pull request that trims it under the bound has what it lacks noted, since the base may have lacked it too", u.out);
+  put("AGENTS.md", `${AGENTS}${big}`); commit("AGENTS.md past the bound");
+  put("AGENTS.md", AGENTS);
+  u = runs();
+  ok(u.status === 0 && u.out.includes(lacks) && u.out.includes("note"), "and so does one that trims AGENTS.md under it", u.out);
+  put("AGENTS.md", `${AGENTS}${big}`);
+  u = runs();
+  ok(u.status === 0 && u.out.includes("note") && u.out.includes("AGENTS.md stands here but is not read"), "an AGENTS.md left past the bound, as the base held it, is noted and fails nothing", u.out);
+  const away = path.join(path.dirname(un), `${path.basename(un)}-away.md`);
+  fs.writeFileSync(away, "@elsewhere.md\n");
+  try {
+    fs.rmSync(path.join(un, "CLAUDE.md")); fs.symlinkSync(away, path.join(un, "CLAUDE.md"));
+    u = runs();
+    ok(u.status === 1 && mended(u.out) && u.out.includes("FAIL: CLAUDE.md stands here but is not read"), "beside an AGENTS.md left unread, an entry file made a link leading out of the project still fails, saying its mend", u.out);
+  } finally { fs.rmSync(away, { force: true }); }
+  put("AGENTS.md", AGENTS); put("CLAUDE.md", "@AGENTS.md\n"); put(".agents/rules/core.md", AG); commit("each read");
+  fs.rmSync(path.join(un, ".agents"), { recursive: true }); fs.symlinkSync("nowhere", path.join(un, ".agents"));
+  u = runs();
+  ok(u.status === 1 && u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `.agents`") && u.out.includes("(here `.agents`)"), "a file behind a folder made a link leading nowhere fails naming that link, in its mend too", u.out);
+  fs.rmSync(path.join(un, ".agents")); put("agents-real/rules/core.md", `${AG}${big}`); fs.symlinkSync("agents-real", path.join(un, ".agents"));
+  u = runs();
+  ok(u.status === 1 && u.out.includes(".agents/rules/core.md stands here but is not read: ") && !u.out.includes("(here `.agents`)"), "a file past the bound behind a link the read follows fails without naming that link, which is not why it is not read", u.out);
+  fs.rmSync(path.join(un, ".agents")); fs.rmSync(path.join(un, "agents-real"), { recursive: true }); put(".agents/rules/core.md", AG);
+  g("update-index", "--add", "--cacheinfo", `160000,${g("rev-parse", "HEAD").trim()},.kiro`); g("commit", "-qm", "a submodule where a tool's folder stands");
+  u = runs();
+  ok(u.status === 0 && u.out.includes("note") && u.out.includes(".kiro/steering/core.md stands here but is not read") && u.out.includes(".kiro/steering, where an agent tool takes its instructions from, lies in a submodule"),
+    "against a base that held a submodule on the way to an entry file, left so, the entry file and the tool's folder are noted and fail nothing", u.out);
+  fs.rmSync(path.join(un, ".agents"), { recursive: true }); fs.mkdirSync(path.join(un, ".kiro/rules"), { recursive: true });
+  fs.writeFileSync(path.join(un, ".kiro/rules/core.md"), AG); fs.symlinkSync(".kiro", path.join(un, ".agents"));
+  u = runs();
+  ok(u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `.agents`"), "a file reached through a link into a submodule names that link", u.out);
+  if (process.platform !== "win32") {
+    fs.rmSync(path.join(un, ".agents")); fs.mkdirSync(path.join(un, "a/b/rules"), { recursive: true });
+    fs.writeFileSync(path.join(un, "a/b/rules/core.md"), AG); fs.symlinkSync("a\\b", path.join(un, ".agents"));
+    u = runs();
+    ok(u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `.agents`"), "a link whose text holds a backslash, which Linux and macOS do not follow as a folder's path, is named where the file behind it is not read", u.out);
+    fs.rmSync(path.join(un, ".agents")); fs.mkdirSync(path.join(un, "inner/rules"), { recursive: true });
+    fs.symlinkSync("nowhere.md", path.join(un, "inner/rules/core.md")); fs.symlinkSync("inner", path.join(un, ".agents"));
+    u = runs();
+    ok(u.out.includes(".agents/rules/core.md stands here but is not read, reached through the link `inner/rules/core.md`:") && !u.out.includes("`.agents`"),
+      "a link that leads nowhere behind a link to a folder inside the project is named, and the folder's link, which is not why, is not", u.out);
+  }
+} finally { fs.rmSync(un, { recursive: true, force: true }); }
 
 // the starter kit's entry files pull in what its AGENTS.md names, each with its tool's part; and the core's own
 const kit = name => fs.readFileSync(path.join(root, "setup/template", name), "utf8");

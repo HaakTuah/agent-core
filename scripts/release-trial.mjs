@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { leadsOut } from "./guards.mjs";
+import { liesOutside } from "./guards.mjs";
 import { answersOf, syncCounts, syncFormed, syncSaid, syncsIn } from "./trial-sync.mjs";
 import { draftFormed, draftHeld, draftRecord, draftSaid, draftReadingsOf, draftsIn, draftsShort } from "./trial-draft-record.mjs";
 
@@ -150,8 +150,8 @@ export const ownCount = printed => printed.split("\n").filter(l => /^- (`[^`]+`|
 // core's own repository.
 function argsRefused(sha, files, syncs, drafts) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? "") || files.length % 2) return `--trial needs the full SHA of the commit tried, then for each project tried the file check.mjs --verdicts wrote before the update and the one it wrote after, each pair followed by \`--sync\` and the file that holds what pure-sync.mjs --trial printed of its sync (${RUNS}); no file where no project allowed a trial`;
-  const inside = [...files, ...syncs.filter(Boolean), ...drafts.filter(d => d?.file).map(d => d.file)].find(f => !leadsOut(ROOT, f));
-  return inside ? `${inside} lies in the core's own repository, where a project's job names could be committed: write the runs' verdicts to a scratch folder outside every repository, and give those files` : null;
+  const inside = [...files, ...syncs.filter(Boolean), ...drafts.filter(d => d?.file).map(d => d.file)].find(f => !liesOutside(ROOT, f));
+  return inside ? `${inside} lies in the core's own repository, where a project's job names could be committed, or where a link on its way leads cannot be told: write the runs' verdicts to a scratch folder outside every repository, and give those files` : null;
 }
 
 // Why the owner's own projects, as state-report.mjs --projects found them (`own`, null where it could not), refuse a

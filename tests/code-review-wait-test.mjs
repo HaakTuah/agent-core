@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Tests for scripts/code-review-wait.mjs: a code review running on the head commit is waited for, a code review of that
 // commit, named by its whole SHA, posted by another reviewer ends the wait, and nothing else holds a pull request. Run by tests.yml.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -265,13 +265,29 @@ try {
   // checkout that tracks scripts/core-path.mjs at its root holds no copy, whatever manifest stands beside it, so a pin
   // moved beside a change under the path that manifest names is no sync; in a project's checkout it is)
   const named = copied("vendor/the-core/");
-  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT }), copy = checkout(dir, "copy", { "core-manifest.md": named });
+  const rulesLine = { "SECURITY.md": "**the rule files:** `docs/rules.md`;\n" };
+  const own = checkout(dir, "own", { "core-manifest.md": named, ...OWN_SCRIPT, ...rulesLine }), copy = checkout(dir, "copy", { "core-manifest.md": named, ...rulesLine });
   const moved = [manifest, md("vendor/the-core/scripts/x.mjs")];
   ok(run(counts, [], { ADVISORY: "false" }, [line], moved, own).status.state === "pending" && run(counts, [], { ADVISORY: "false" }, [line], moved, copy).status.state === "success",
     "the core's own checkout, with a manifest at its root, holds no copy: a pin moved beside a change under the path it names needs its code review; a project's is a sync");
   ok(run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("core/.github/notes.md")], own).status.state === "pending" && run(proved, [], { ADVISORY: "false", QUEUE: HEAD }, [line], [md("vendor/the-core/.github/notes.md")], copy).status.state === "success",
     "and holding no copy, it leaves nothing aside, core/ included: a file there that runs by itself is no queue line; under a project's copy it is");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
+  // (a project whose SECURITY.md has no line of its rule files: its own list cannot be read, so every file is read as
+  // protected, as in the core, saying the mend; the pull request that adds the line passes once its code review has run,
+  // and a sync's shape, which reads no list, needs none)
+  const lineless = checkout(dir, "lineless", { "SECURITY.md": "# Security\n", "core-manifest.md": named });
+  const adds = [{ filename: "SECURITY.md", status: "modified", patch: "+**the rule files:** `docs/rules.md`;" }];
+  let warned = "";
+  const runLineless = (c, f) => {
+    writeFileSync(join(dir, "pull.json"), JSON.stringify(counts)); writeFileSync(join(dir, "comments.json"), JSON.stringify(c)); writeFileSync(join(dir, "commits.json"), JSON.stringify([line])); writeFileSync(join(dir, "files.json"), JSON.stringify(f));
+    const r = spawnSync(process.execPath, [script, join(dir, "pull.json"), join(dir, "comments.json"), join(dir, "commits.json"), join(dir, "files.json")], { cwd: lineless, encoding: "utf8", env: { ...process.env, ADVISORY: "false" } });
+    warned = r.stderr;
+    return r.status === 0 ? JSON.parse(r.stdout).status?.state : `exit ${r.status}`;
+  };
+  ok(runLineless([], [md("docs/rules.md")]) === "pending" && /no "the rule files:" line.* Mend: add to rule 3 the line/.test(warned) && /every file is read as protected/.test(warned)
+    && runLineless([], adds) === "pending" && runLineless([[summary(done)]], adds) === "success" && runLineless([[summary(done)]], [md("docs/notes.md")]) === "success" && runLineless([], moved) === "success",
+  "where the project's SECURITY.md names no rule files, it does not take the list as empty: every file is read as protected, so a Markdown file waits for its code review, saying the mend, and the pull request that adds the line passes once its code review has run; a sync's shape, which reads no list, needs none", warned);
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
   ok(usage === 2, "with no files named, it says how it is run");

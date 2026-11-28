@@ -14,8 +14,10 @@
 // or between the links of a chain, is listed with it, and one on the way to a tool's folder is named (wayLinks):
 // readHere, linksIn's and readAt's readers carry both. A tool's folder that a submodule holds, which no check here can
 // read, entry-files.mjs fails.
-// Not hardened here, each needing links the project already holds on its default branch: what a link inside a tool's
-// folder leads to where it is a folder, and the links on the way to a rule file its SECURITY.md names, are not listed.
+// Not hardened here, each needing a link the project already holds on its default branch: a file its SECURITY.md names
+// among the rule files is listed by that name alone, so where it is a link, or a link stands on its way, neither the
+// link nor what it leads to is listed with it, and the same holds of a link on the way to .github/, .claude/ or the
+// copy of the core; and a link inside a tool's folder that leads to a folder lists the files there as no tool's file.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -126,12 +128,14 @@ export function placeAt(commit, run = args => execFileSync("git", args, { encodi
   // leads nowhere, held, while a part of the path's own that the tree lacks, past every link, holds nothing; a link
   // that leads out of the tree, one past 4096 bytes, a submodule on the way and more than 40 links are held)
   const held = f => {
+    // (the path as written folded first, a `..` in it read by its spelling: a caller names a path as git names a file,
+    // with none; only a `..` that a link's text brings is read from the folder the link reached, below)
     const todo = path.posix.normalize(f).split("/").map(p => ({ p, linked: false }));
     for (let cur = "", hops = 0; todo.length;) {
       const { p, linked } = todo.shift();
       if (p === "" || p === ".") continue;
       if (mode(cur) === "160000") return true;
-      if (p === "..") { if (cur === "" || !isFolder(cur)) return true; cur = cur.includes("/") ? cur.slice(0, cur.lastIndexOf("/")) : ""; continue; }
+      if (p === "..") { if (!isFolder(cur)) return true; cur = cur.includes("/") ? cur.slice(0, cur.lastIndexOf("/")) : ""; continue; }
       const next = cur ? `${cur}/${p}` : p, m = mode(next);
       if (m === "120000") {
         const to = ++hops > 40 ? null : linkText(next);

@@ -40,7 +40,7 @@ import { carriedAt, readCore } from "./core-path.mjs";
 import { MEND } from "./mend.mjs";
 import { hostSaid, plainEnv } from "./releases.mjs";
 import { started } from "./started.mjs";
-import { leadsOut } from "./guards.mjs";
+import { liesOutside } from "./guards.mjs";
 import { installed, notInstalled } from "./packages.mjs";
 import { parseYaml } from "./parse-yaml.mjs";
 import { evaluate, lookOnlyOnPath, runWorkflow, withAbsolutePath } from "./workflow-run.mjs";
@@ -119,12 +119,12 @@ function main() {
   process.exitCode = closing(counts, say, warn);
 }
 
-// --verdicts names a file outside the project's repository, and no link: leadsOut reads a link to nothing as leading
-// out, and a write follows a link to where it points.
+// --verdicts names a file surely outside the project's repository (liesOutside: a link to nothing on its way, or a
+// `..` after a part that does not stand, is refused), and no link, since a write follows a link to where it points.
 function outside(p, given) {
-  if (!leadsOut(p.root, p.verdicts)) fail(`--verdicts ${given} lies in the project's own repository, which this check writes nothing in.`, "give a file in a scratch folder outside every repository.");
   const at = fs.lstatSync(p.verdicts, { throwIfNoEntry: false });
   if (at && !at.isFile()) fail(`--verdicts ${given} is ${at.isSymbolicLink() ? "a link" : "no file"}, which this check writes nothing through.`, "give a file in a scratch folder outside every repository, one that is no link and does not stand yet or is a file.");
+  if (!liesOutside(p.root, p.verdicts)) fail(`--verdicts ${given} lies in the project's own repository, or where a link on its way leads cannot be told, and this check writes nothing there.`, "give a file in a scratch folder outside every repository, reached through no link that leads nowhere.");
 }
 
 // Writes the verdicts afresh, once more held outside the project, the file that stood taken out first and the new one
@@ -133,7 +133,7 @@ function writeVerdicts(p, given) {
   outside(p, given);
   try {
     fs.rmSync(p.verdicts, { force: true });
-    const from = leadsOut(p.root, fileURLToPath(import.meta.url)) ? { [RUN_FROM]: "a clone of the core" } : {};
+    const from = liesOutside(p.root, fileURLToPath(import.meta.url)) ? { [RUN_FROM]: "a clone of the core" } : {};
     fs.writeFileSync(p.verdicts, `${JSON.stringify({ ...verdicts, ...from }, null, 2)}\n`, { flag: "wx" });
   } catch (e) { fail(`--verdicts ${given} could not be written (${e.code ?? e.message}).`, "give a file in a scratch folder outside every repository that nothing else writes to, and run the check again."); }
 }

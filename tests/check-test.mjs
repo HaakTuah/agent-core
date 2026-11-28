@@ -68,6 +68,12 @@ let linked = true;
 try { fs.symlinkSync(path.join(dir, "linked.json"), dangling, "file"); } catch { linked = false; }
 const through = linked ? check(dir, "--verdicts", dangling) : null;
 ok(!linked || (through.status === 1 && mended(through.out) && /--verdicts .* is a link/.test(through.out) && !fs.existsSync(path.join(dir, "linked.json"))), "--verdicts that is a link to nothing in the project's repository is refused, saying its mend, and nothing is written there", through?.out);
+// (and one under a folder link in the project's repository that leads nowhere: where it leads cannot be told)
+let folded = true;
+try { fs.symlinkSync(path.join(dir, "gone"), path.join(dir, "nowhere"), "junction"); } catch { folded = false; }
+const unsure = folded ? check(dir, "--verdicts", path.join(dir, "nowhere", "v.json")) : null;
+ok(!folded || (unsure.status === 1 && mended(unsure.out) && /--verdicts .* or where a link on its way leads cannot be told/.test(unsure.out) && !fs.existsSync(path.join(dir, "gone"))), "--verdicts under a folder link in the project's repository that leads nowhere is refused, saying its mend, and nothing is written there", unsure?.out);
+if (folded) fs.rmSync(path.join(dir, "nowhere"));
 ok(verdicts["own.yml/fine"] === "passed" && verdicts["own.yml/broken"] === "failed" && !("own.yml/later" in verdicts) && verdicts["core.yml/core/core"] === "passed" && verdicts["own.yml/mac"] === "unrun" && Object.values(verdicts).every(v => /^(pass|fail)ed$|^unrun$|^unread$/.test(v)),
   "and --verdicts writes each job's verdict that ran, the core's and the project's own, by its place", JSON.stringify(verdicts));
 ok(verdicts["own.yml/gate"] === "passed" && verdicts["own.yml/odd"] === "unread" && verdicts["own.yml/behind"] === "unread" && !("own.yml" in verdicts) && Object.entries(verdicts).filter(([, v]) => v === "unread").length === 2
