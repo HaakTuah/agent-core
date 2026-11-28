@@ -274,8 +274,9 @@ try {
     "and holding no copy, it leaves nothing aside, core/ included: a file there that runs by itself is no queue line; under a project's copy it is");
   ok(JSON.stringify(run({ ...pull, draft: true }, [])) === "{}", "a draft prints nothing to mark");
   // (a project whose SECURITY.md has no line of its rule files: its own list cannot be read, so every file is read as
-  // protected, as in the core, saying the mend; the pull request that adds the line passes once its code review has run)
-  const lineless = checkout(dir, "lineless", { "SECURITY.md": "# Security\n" });
+  // protected, as in the core, saying the mend; the pull request that adds the line passes once its code review has run,
+  // and a sync's shape, which reads no list, needs none)
+  const lineless = checkout(dir, "lineless", { "SECURITY.md": "# Security\n", "core-manifest.md": named });
   const adds = [{ filename: "SECURITY.md", status: "modified", patch: "+**the rule files:** `docs/rules.md`;" }];
   let warned = "";
   const runLineless = (c, f) => {
@@ -285,8 +286,8 @@ try {
     return r.status === 0 ? JSON.parse(r.stdout).status?.state : `exit ${r.status}`;
   };
   ok(runLineless([], [md("docs/rules.md")]) === "pending" && /no "the rule files:" line.* Mend: add to rule 3 the line/.test(warned) && /every file is read as protected/.test(warned)
-    && runLineless([], adds) === "pending" && runLineless([[summary(done)]], adds) === "success" && runLineless([[summary(done)]], [md("docs/notes.md")]) === "success",
-  "where the project's SECURITY.md names no rule files, it does not take the list as empty: every file is read as protected, so a Markdown file waits for its code review, saying the mend, and the pull request that adds the line passes once its code review has run", warned);
+    && runLineless([], adds) === "pending" && runLineless([[summary(done)]], adds) === "success" && runLineless([[summary(done)]], [md("docs/notes.md")]) === "success" && runLineless([], moved) === "success",
+  "where the project's SECURITY.md names no rule files, it does not take the list as empty: every file is read as protected, so a Markdown file waits for its code review, saying the mend, and the pull request that adds the line passes once its code review has run; a sync's shape, which reads no list, needs none", warned);
   let usage = 0;
   try { execFileSync(process.execPath, [script], { stdio: "ignore" }); } catch (e) { usage = e.status; }
   ok(usage === 2, "with no files named, it says how it is run");

@@ -18,7 +18,7 @@
 // is a Markdown file outside the rule files (docs alone; the rule files: floor rule 3's names in any folder, such as
 // CLAUDE.local.md too, the copy under core/ or the path the default branch's manifest names, .github/, .claude/ and
 // each agent tool's own folder (.agents/, .agent/, .kiro/, .codex/ and the like: rule-files.mjs, RULES), each link on
-// the way to a tool's or floor file or folder, and those the project's SECURITY.md adds; never in the core's own repository, where every file is protected, nor in a project whose SECURITY.md names none), nor where the pull request has
+// the way to a tool's or floor file or folder, and those the project's SECURITY.md adds; never in the core's own repository, where every file is protected, nor in a project whose SECURITY.md names none, where only a sync's shape needs none), nor where the pull request has
 // a sync's shape: the copy at that path, the manifest's pin and workflows whose pins alone move (floor rule 8: a pure
 // sync gets no review; that its copy is the core's is scripts/pure-sync.mjs's to prove, not this check's), nor where
 // the caller proved it queue-only with the default branch's queue-only.mjs (QUEUE, its files one Markdown file: floor
@@ -186,10 +186,11 @@ function needs(pull, files, rules, copy, folders = [], all = false) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename]).filter((name) => name !== undefined);
   if (names.length === 0 || names.some((name) => typeof name !== "string")) return names.length > 0;
   // (in the core's own repository every file is protected, its SECURITY.md says, and every pull request gets its code
-  // review: AGENTS.md, "How changes are made here"; so too where a project's own list cannot be read: all)
-  if (all || String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
+  // review: AGENTS.md, "How changes are made here")
+  if (String(pull.base?.repo?.full_name).toLowerCase() === CORE.toLowerCase()) return true;
   const rule = (name) => isRule(name, rules, copy, folders);
-  if (names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
+  // (where a project's own list cannot be read, all, no Markdown file is docs alone; a sync's shape reads no list)
+  if (!all && names.every((name) => /\.md$/iu.test(name) && !rule(name))) return false;
   // (the copy at the path the manifest's line names, which a sync's patch shows beside the pin it moves: core-path.mjs)
   const at = copyIn(files, copy);
   const sync = files.every((file) => (file.filename === "core-manifest.md" && pinsAlone(file, MANIFEST)) || (file.filename.startsWith(at) && (file.previous_filename ?? at).startsWith(at))
