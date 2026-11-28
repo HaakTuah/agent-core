@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -46,4 +46,15 @@ export function copyRefused(root, at) {
   if (own && copy && off === undefined) return null;
   const which = !own ? "the core running these steps is no work tree git lists" : !copy ? `git could not list ${at}` : `${at}${off} ${!copy.has(off) ? "is missing" : !own.has(off) ? "is not the core's" : "is changed"}`;
   return `${at}'s scripts and packages are not those of the core running these steps (${which}), so none of them was run from here. Mend: run the steps from the project's copy, \`node ${at}scripts/steps.mjs\`, or from a clone of the core at the copy's pin`;
+}
+
+// A script of the copy at `at` run from the project's root `root`, given ten minutes so that none holds its caller:
+// { status, out, err, error }, or { refused } where the copy holds no such script or may not be run from here.
+export function runCopy(root, at, script, args, env = {}) {
+  const file = path.join(root, at, "scripts", script);
+  if (!fs.existsSync(file)) return { refused: `no copy of ${script} to run` };
+  const refused = copyRefused(root, at);
+  if (refused) return { refused };
+  const r = spawnSync(process.execPath, [file, ...args], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600000, env: { ...process.env, ...env } });
+  return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
 }

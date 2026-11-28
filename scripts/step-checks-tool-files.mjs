@@ -2,7 +2,7 @@
 // listed (steps.mjs, beside this file, holds the steps, and step-checks.mjs the words they share). Each piece takes
 // the project as steps.mjs's `project` reads it and returns the mend, or null where the step is done; a step names the
 // ones it needs, none runs by itself. It reads only. Node's own modules and git only.
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -12,7 +12,7 @@ import { FOLDERS, TOOL_FILES, ruleFiles } from "./rule-files.mjs";
 import { Unread, copyAt } from "./workflow-calls.mjs";
 import { copiesConfig } from "./check-configs.mjs";
 import { shown } from "./step-checks.mjs";
-import { copyRefused } from "./copy-runs.mjs";
+import { runCopy } from "./copy-runs.mjs";
 
 // Whether what the copies and pointer checks hold against in an agent tool's files is listed (#405; core-changes/projects.md of the
 // core, "Nothing locks a project": no old breach goes unlisted): each copy there in the copies check's baseline, which
@@ -76,16 +76,13 @@ function filesRead(p, config, tracked, git) {
   } catch { return null; }
 }
 
-// (the copy's scripts run only where they are the core's code running now, byte for byte: copy-runs.mjs; each given ten
-// minutes, so that none holds the steps)
+// (the copy's scripts run only where copy-runs.mjs lets them, each given ten minutes)
 export function toolFilesRead(p, config) {
-  const at = script => path.join(p.root, copyAt(p), "scripts", script);
-  for (const script of ["copies.mjs", "pointers.mjs"]) if (!fs.existsSync(at(script))) throw new Unread(`no copy of ${script} to run`);
-  const refused = copyRefused(p.root, copyAt(p));
-  if (refused) throw new Unread(refused);
+  for (const script of ["copies.mjs", "pointers.mjs"]) if (!fs.existsSync(path.join(p.root, copyAt(p), "scripts", script))) throw new Unread(`no copy of ${script} to run`);
   const run = (script, args, env) => {
-    const r = spawnSync(process.execPath, [at(script), ...args], { cwd: p.root, encoding: "utf8", maxBuffer: 1 << 28, timeout: 600000, env: { ...process.env, ...env } });
-    return { status: r.status, out: `${r.stdout}`, err: `${r.stderr}`, error: r.error };
+    const r = runCopy(p.root, copyAt(p), script, args, env);
+    if (r.refused) throw new Unread(r.refused);
+    return r;
   };
   // (a run that never reached its verdict read nothing: reported as not read, never as done)
   const copies = run("copies.mjs", [config], { COPIES_BASE: "" });
