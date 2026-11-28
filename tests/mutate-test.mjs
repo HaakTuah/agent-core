@@ -99,8 +99,8 @@ try {
   fs.symlinkSync(path.join("..", "src", "ws"), path.join(dir, "node_modules", "ws"), "junction");
   write("test/ws-test.mjs", "import { flag } from 'ws/index.mjs';\nif (!flag()) process.exit(1);\n");
   git("add", "src/ws/index.mjs", "test/ws-test.mjs");
-  // (and beside it, a link whose spelling leads back to itself, read by the system out of the project through a folder
-  // link: the copy's folder is made, and the run ends)
+  // (and beside it, a link the system reads out of the project, though its spelling stays inside: the copies are made
+  // as for any link out)
   foldedLoop(dir, "node_modules/loop");
   const ws = spawnSync(process.execPath, [SCRIPT, "--report", out, "src/ws/index.mjs"], { cwd: dir, encoding: "utf8", timeout: 300000, killSignal: "SIGKILL" });
   const wsFault = JSON.parse(fs.readFileSync(out, "utf8")).files["src/ws/index.mjs"]?.mutants.find(m => m.replacement === "false");

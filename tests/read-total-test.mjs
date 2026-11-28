@@ -122,12 +122,11 @@ const inProject = spawnSync(process.execPath, [path.join(copy, "read-total.mjs")
 fs.rmSync(proj, { recursive: true, force: true });
 ok(inProject.status === 0 && /^not run: the total read reads the core's own repository alone/.test(inProject.stdout), "in a project's copy of the core it reads nothing, says so, and fails nothing", inProject.stdout + inProject.stderr);
 
-// (a link whose spelling leads back to itself, read by the system out of the tree through a folder link: no file, and
-// the reading ends)
+// (a link the system reads out of the tree, though its spelling stays inside: no file)
 const folded = scratchDir("read-total-folded-");
 if (foldedLoop(folded, "AGENTS.md")) {
   const said = inTime(`import { tree } from ${JSON.stringify(new URL("../scripts/read-total.mjs", import.meta.url).href)};\nconsole.log(JSON.stringify(tree(null, ${JSON.stringify(folded)}).read("AGENTS.md")));`);
-  ok(said?.trim() === "null", "a link whose spelling leads back to itself, through a folder link out of the tree, is read as no file, and the reading ends", said ?? "stopped past its time");
+  ok(said?.trim() === "null", "a link the system reads out of the tree, though its spelling stays inside, is read as no file", said ?? "stopped past its time");
 }
 
 console.log(failed ? `${failed} of ${count} failed` : `ok   ${count} assertions on the total read`);

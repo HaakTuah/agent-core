@@ -132,7 +132,7 @@ if (process.platform !== "win32") {
     const folder = foldedLoop(project, "core/scripts"), away = path.join(folder, "run.sh");
     fs.rmSync(folder); fs.mkdirSync(folder); fs.writeFileSync(away, "x"); fs.chmodSync(away, 0o644);
     const said = inTime(`import { recordModes } from ${JSON.stringify(new URL("../scripts/copy-tree.mjs", import.meta.url).href)};\nrecordModes("core", ${JSON.stringify(modes)}, ${JSON.stringify(repo)});\nconsole.log("ended");`, { cwd: project });
-    ok(said?.trim() === "ended" && !(fs.statSync(away).mode & 0o111), "  nor through a folder of it that is a link whose spelling leads back to itself, through a folder link out of the copy, and the sync ends", said ?? "stopped past its time");
+    ok(said?.trim() === "ended" && !(fs.statSync(away).mode & 0o111), "  nor through a folder of it that the system reads out of the copy, though its spelling stays inside", said ?? "stopped past its time");
   } finally { process.chdir(here); }
 }
 ok(entries(treeOf(`120000 blob ${blob}\trun.sh`), repo) !== entries(plain, repo), "a link in its place is not");

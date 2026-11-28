@@ -77,13 +77,12 @@ for (const [form, [file, content]] of Object.entries(FORMS)) {
   ok(!/twin\.yml/u.test(r.stdout) && fs.lstatSync(path.join(dir, ".github/workflows/twin.yml")).isSymbolicLink(), "a workflow that is a link is not read as the project's own", r.stdout);
 }
 
-// A link whose spelling leads back to itself, read by the system out of the project through a folder link, is a link,
-// and reading it ends.
+// A link the system reads out of the project, though its spelling stays inside, is a link.
 {
   const dir = project("folded");
   if (foldedLoop(dir, "loop.md")) {
     const said = inTime(`import { linked } from ${JSON.stringify(new URL("../scripts/twice-files.mjs", import.meta.url).href)};\nconsole.log(linked({ root: ${JSON.stringify(dir)} }, "loop.md"));`);
-    ok(said?.trim() === "true", "a link whose spelling leads back to itself, through a folder link out of the project, is read as a link, and the reading ends", said ?? "stopped past its time");
+    ok(said?.trim() === "true", "a link the system reads out of the project, though its spelling stays inside, is read as a link", said ?? "stopped past its time");
   }
 }
 

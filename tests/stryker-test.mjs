@@ -140,7 +140,7 @@ try {
   if (foldedLoop(pkg, "loop.mjs")) {
     fs.writeFileSync(`${pkg}/package.json`, JSON.stringify({ bin: "loop.mjs" }));
     const said = inTime(`import { vitestAt } from ${JSON.stringify(new URL("../scripts/stryker.mjs", import.meta.url).href)};\nconsole.log(JSON.stringify(vitestAt(${JSON.stringify(vt)})));`);
-    ok(said?.trim() === "null", "nor one a link whose spelling leads back to itself leads out of it to, through a folder link, and the reading ends", said ?? "stopped past its time");
+    ok(said?.trim() === "null", "nor one a link leads to that the system reads out of it, though its spelling stays inside", said ?? "stopped past its time");
   }
   const jest = spawnSync(process.execPath, [SCRIPT, "--tool", ".", "--runner", "jest", "--report", "r.json"], { encoding: "utf8" }).stderr;
   ok(/told to run its tests with jest.*--runner vitest/.test(jest) && mended(jest), "another runner is refused, saying the mend", jest);

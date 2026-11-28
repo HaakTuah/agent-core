@@ -24,7 +24,7 @@ fs.writeFileSync(path.join(outside, "pin.txt"), "loads mossgrip@1.5.4 here\n");
 ok(throws(() => current([{ ...entry, file: path.relative(root, path.join(outside, "pin.txt")) }], root)), "an entry's file outside the project fails");
 if (foldedLoop(root, "loop.txt")) {
   const said = inTime(`import { current } from ${JSON.stringify(new URL("../scripts/versions.mjs", import.meta.url).href)};\ntry { current([${JSON.stringify({ ...entry, file: "loop.txt" })}], ${JSON.stringify(root)}); } catch (e) { console.log(e.message); }`);
-  ok(/loop\.txt is outside the project/u.test(said ?? ""), "an entry's file that a link leads out of the project to, by a `..` after a folder link that its spelling folds back to itself, fails as outside, and the check ends");
+  ok(/loop\.txt is outside the project/u.test(said ?? ""), "an entry's file that a link leads to, which the system reads out of the project though its spelling stays inside, fails as outside");
 }
 fs.writeFileSync(path.join(root, "..pin.txt"), "loads mossgrip@1.5.4 here\n");
 ok(current([{ ...entry, file: "..pin.txt" }], root).length === 1, "a file whose name only starts with two dots is inside");

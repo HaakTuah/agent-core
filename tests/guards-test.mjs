@@ -7,7 +7,7 @@
 //   node tests/guards-test.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unrooted } from "../scripts/guards.mjs";
+import { DEEPEST, aCommit, aLogin, aRepository, inProject, asText, leadsOut, linkedOut, logged, loggedAlone, loggedCause, noSignIn, noSignInWhole, oneLine, quotedAlone, seen, tooDeep, unfolded, unrooted } from "../scripts/guards.mjs";
 import { mended } from "../scripts/mend.mjs";
 import { scratchDir } from "../scripts/scratch-core.mjs";
 
@@ -49,6 +49,13 @@ try {
     process.chdir(project);
     ok([`${project}${path.sep}${given}`, given].every(at => leadsOut(project, at) === readOut) && leadsOut(".", ["far", "..", "new.json"].join(path.sep)) === readOut,
       "a path given with a `..` after a folder link out of the project leads out exactly where a read of it leads outside, also where it does not stand yet, though its spelling stays inside");
+    ok([["nowhere", "..", "..", "elsewhere", "new.json"], ["inner", "nowhere", "..", "..", "..", "elsewhere"], ["nowhere", ".", "new.json"]].every(parts => leadsOut(project, parts.join(path.sep))),
+      "a path whose `..` or `.` stands after a part that does not stand leads out, since a write that makes its folders could follow it out of the project");
+    if (process.platform === "win32") {
+      const drive = project.slice(0, 2);
+      ok(unfolded(`${drive}inner\\own.json`) === path.join(project, "inner", "own.json") && !leadsOut(project, `${drive}inner\\own.json`) && leadsOut(project, `${drive}away\\other.json`),
+        "a drive's path with no folder after the drive is read from that drive's own folder, where it stays inside or leads out through a link");
+    }
   } finally { process.chdir(was); }
   if (fileLink) {
     fs.symlinkSync(path.join(elsewhere, "gone.json"), path.join(project, "dangling.json"));
