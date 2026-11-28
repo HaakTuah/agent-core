@@ -52,9 +52,9 @@ try {
     ok([["nowhere", "..", "..", "elsewhere", "new.json"], ["inner", "nowhere", "..", "..", "..", "elsewhere"], ["nowhere", ".", "new.json"]].every(parts => leadsOut(project, parts.join(path.sep))),
       "a path whose `..` or `.` stands after a part that does not stand leads out, since a write that makes its folders could follow it out of the project");
     if (process.platform === "win32") {
-      const drive = project.slice(0, 2);
-      ok(unfolded(`${drive}inner\\own.json`) === path.join(project, "inner", "own.json") && !leadsOut(project, `${drive}inner\\own.json`) && leadsOut(project, `${drive}away\\other.json`),
-        "a drive's path with no folder after the drive is read from that drive's own folder, where it stays inside or leads out through a link");
+      const drive = project.slice(0, 2), other = drive.toUpperCase() === "C:" ? "D:" : "C:";
+      ok(unfolded(`${drive}inner\\own.json`) === path.join(project, "inner", "own.json") && !leadsOut(project, `${drive}inner\\own.json`) && leadsOut(project, `${drive}away\\other.json`) && leadsOut(project, `${other}own.json`),
+        "a drive's path with no folder after the drive is read from that drive's own folder, where it stays inside or leads out through a link, and on another drive leads out");
     }
   } finally { process.chdir(was); }
   if (fileLink) {
