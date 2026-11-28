@@ -17,10 +17,11 @@
 //
 //   node core/scripts/entry-files.mjs           from a project's root, as the copies workflow runs it
 //   node scripts/entry-files.mjs --core         in the core's own repository
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { ownText } from "./core-path.mjs";
-import { ENTRY_FILES, followLinks, placeAt, readAt } from "./rule-files.mjs";
+import { ENTRY_FILES, followLinks, isFolderHere, isLinkHere, linkTextHere, placeAt, readAt } from "./rule-files.mjs";
 import { asText, leadsOut } from "./guards.mjs";
 import { guard } from "./mend.mjs";
 
@@ -46,21 +47,32 @@ export const ENTRY = [
 
 // The most bytes of an entry file or AGENTS.md read, here and at the base alike (SECURITY.md, the 1 MB of a tool's files).
 const BOUND = 1 << 20;
-// Whether anything stands at the path: a link that leads nowhere included, and a folder on its way that is a link
-// leading nowhere or out of the project, behind which no check can see what stands.
+// Whether anything stands at the path: a link that leads nowhere included, a folder on its way that is a link
+// leading nowhere or out of the project, and a submodule at the path or on its way, behind which no check can see what
+// stands.
 const standsHere = file => {
+  if (inSubmodule(file)) return true;
   try { fs.lstatSync(file); return true; } catch { /* (then each folder on its way) */ }
   const parts = clean(file).split("/");
   return parts.slice(0, -1).some((_, i) => { const up = parts.slice(0, i + 1).join("/"); try { return fs.lstatSync(up).isSymbolicLink() && leadsOut(".", up); } catch { return false; } });
 };
 
 const clean = p => path.posix.normalize(String(p).replace(/\\/gu, "/")).replace(/^\.\//u, "");
+// (the submodules git's index holds: a tool reads what is checked out there, another repository's files, which the
+// base's tree holds no text of; none where git cannot be read)
+let gitlinks = null;
+const inSubmodule = file => {
+  if (!gitlinks) {
+    gitlinks = new Set();
+    try { for (const e of execFileSync("git", ["ls-files", "-s", "-z"], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] }).split("\0")) { const m = /^160000 \S+ \d+\t([\s\S]+)$/u.exec(e); if (m) gitlinks.add(m[1]); } } catch { /* (none) */ }
+  }
+  const parts = clean(file).split("/");
+  return parts.some((_, i) => gitlinks.has(parts.slice(0, i + 1).join("/")));
+};
 // Whether each link on the file's way is one rule-files.mjs's placeAt follows at a commit (followLinks): written
-// relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link alike.
-const isLink = p => { try { return fs.lstatSync(p).isSymbolicLink(); } catch { return false; } };
-const linkText = p => { try { return fs.readlinkSync(p); } catch { return null; } };
-const isFolder = p => { try { return fs.lstatSync(p).isDirectory(); } catch { return false; } };
-const asTheBaseReads = file => followLinks(clean(file), isLink, linkText, isFolder) !== null;
+// relative, and inside the tree as written, every link followed, at most 40; so the work tree and the base read a link
+// alike where a `..` is read as Linux and macOS read it (followLinks says what holds on Windows).
+const asTheBaseReads = file => followLinks(clean(file), isLinkHere, linkTextHere, isFolderHere) !== null;
 
 // What each entry file the project holds lacks of AGENTS.md's list: [{ file, tool, missing: [path], line, off }], `off`
 // why its tool would not load it at all (every file is then missing), or null.
@@ -103,14 +115,14 @@ if (guard(import.meta.url)) {
   const core = process.argv.includes("--core"), base = core ? "" : process.env.ENTRY_BASE ?? "";
   // (the work tree's files as ownText reads them, a link inside the project followed, and the base's as readAt reads
   // its tree, each link inside it followed the same way, so that a file the base held as a link reads as its target)
-  // (a file that stands here but that ownText refuses, or that a link on its way written from a root or climbing above
-  // the project's root reaches, is one no check can read: it fails where the base read it or held nothing there, as
+  // (a file that stands here but that ownText refuses, that lies in a submodule, or that a link on its way written from
+  // a root or climbing above the project's root reaches, is one no check can read: it fails where the base read it or held nothing there, as
   // the pull request's own doing, and is noted where the base held it unread too)
   const unread = new Set(), place = base ? placeAt(base) : null, was = place ? readAt(base, place, { bound: BOUND }) : null;
-  const here = file => { const text = asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
+  const here = file => { const text = !inSubmodule(file) && asTheBaseReads(file) ? ownText(file, { bound: BOUND }) : null; if (text === null && standsHere(file)) unread.add(file); return text; };
   const read = verdict(here, was);
   for (const f of unread) {
-    const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no such link on its way`;
+    const said = `${f} stands here but is not read: it is no regular file of the project's own of at most 1 MB, outside any submodule, reached by no link written from a root or climbing above the project's root, so what it pulls in cannot be checked. Mend: make ${f} a regular file of the project's own, of at most 1 MB, with no submodule and no such link on its way`;
     (core || (was && (was(f) !== null || !place.held(f))) ? read.fails : read.notes).push(said);
   }
   // (in a project with no base to read against, nothing is new: each is a note)
